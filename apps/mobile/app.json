@@ -21,6 +21,21 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "O Easy OS usa sua localização para registrar o check-in e o check-out da OS."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "O Easy OS usa a câmera para anexar fotos à OS."
+        }
+      ]
+    ]
   }
 }
