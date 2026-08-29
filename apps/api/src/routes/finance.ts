@@ -6,6 +6,7 @@ import {
   createBudgetInputSchema,
   createInvoiceInputSchema,
   payInvoiceInputSchema,
+  SERVICE_ORDER_TRANSITIONS,
   type PaymentMethod,
 } from "@easy-os/schemas";
 import { db } from "../db/client.js";
@@ -16,6 +17,7 @@ import {
   customers,
   invoices,
   materials,
+  serviceOrderEvents,
   serviceOrderMaterials,
   serviceOrders,
 } from "../db/schema.js";
@@ -120,10 +122,22 @@ export const financeRoutes: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const input = createInvoiceInputSchema.parse(request.body);
+      const currentUser = request.currentUser!;
 
       const [existing] = await db.select().from(invoices).where(eq(invoices.serviceOrderId, id));
       if (existing) {
         return reply.code(422).send({ message: "Essa OS já tem uma fatura" });
+      }
+
+      const [current] = await db.select().from(serviceOrders).where(eq(serviceOrders.id, id));
+      if (!current) {
+        return reply.code(404).send({ message: "OS não encontrada" });
+      }
+      const allowed = SERVICE_ORDER_TRANSITIONS[current.status];
+      if (!allowed.includes("invoiced")) {
+        return reply.code(422).send({
+          message: `Não é possível faturar uma OS em "${current.status}"`,
+        });
       }
 
       const [budget] = await db.select().from(budgets).where(eq(budgets.serviceOrderId, id));
@@ -148,6 +162,13 @@ export const financeRoutes: FastifyPluginAsync = async (app) => {
         .insert(invoices)
         .values({ serviceOrderId: id, totalAmount, paymentMethod: input.paymentMethod })
         .returning();
+
+      await db.update(serviceOrders).set({ status: "invoiced" }).where(eq(serviceOrders.id, id));
+      await db.insert(serviceOrderEvents).values({
+        serviceOrderId: id,
+        status: "invoiced",
+        createdBy: currentUser.id,
+      });
 
       return reply.code(201).send(invoice);
     },
