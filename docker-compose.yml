@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: easy_os
+      POSTGRES_PASSWORD: easy_os
+      POSTGRES_DB: easy_os
+    ports:
+      - "5432:5432"
+    volumes:
+      - easy-os-postgres:/var/lib/postgresql/data
+
+volumes:
+  easy-os-postgres:

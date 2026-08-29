@@ -1,0 +1,32 @@
+{
+  "name": "@easy-os/api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "dotenv -e .env -- tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "dotenv -e .env -- node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "echo \"(lint not configured yet)\"",
+    "db:generate": "dotenv -e .env -- drizzle-kit generate",
+    "db:migrate": "dotenv -e .env -- tsx src/db/migrate.ts",
+    "db:studio": "dotenv -e .env -- drizzle-kit studio"
+  },
+  "dependencies": {
+    "@easy-os/schemas": "workspace:*",
+    "@fastify/cors": "^10.0.0",
+    "better-auth": "^1.7.2",
+    "drizzle-orm": "^0.45.2",
+    "fastify": "^5.2.0",
+    "postgres": "^3.4.0",
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "dotenv-cli": "^7.4.0",
+    "drizzle-kit": "^0.31.10",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

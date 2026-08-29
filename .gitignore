@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.turbo/
+.env
+.env.local
+*.log
+*.tsbuildinfo
+
+# expo
+.expo/
+apps/mobile/.expo/
+
+# editors/os
+.DS_Store
+Thumbs.db
