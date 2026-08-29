@@ -87,6 +87,7 @@ export const session = pgTable("session", {
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const account = pgTable("account", {
@@ -95,9 +96,17 @@ export const account = pgTable("account", {
     .notNull()
     .references(() => user.id, { onDelete: "cascade" }),
   providerId: text("provider_id").notNull(),
+  issuer: text("issuer"),
   accountId: text("account_id").notNull(),
-  passwordHash: text("password_hash"),
+  password: text("password"),
+  accessToken: text("access_token"),
+  refreshToken: text("refresh_token"),
+  idToken: text("id_token"),
+  accessTokenExpiresAt: timestamp("access_token_expires_at"),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at"),
+  scope: text("scope"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const verification = pgTable("verification", {
@@ -105,6 +114,8 @@ export const verification = pgTable("verification", {
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
   expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 // ---------------------------------------------------------------------------

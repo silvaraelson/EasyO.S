@@ -16,6 +16,13 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  advanced: {
+    database: {
+      // As colunas `id` são uuid com defaultRandom() (ver schema.ts) — deixa o
+      // Postgres gerar o UUID em vez do Better Auth gerar um id não-UUID.
+      generateId: false,
+    },
+  },
   user: {
     additionalFields: {
       role: {

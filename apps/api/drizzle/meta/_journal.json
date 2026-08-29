@@ -15,6 +15,20 @@
       "when": 1788020974670,
       "tag": "0001_cultured_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788023183236,
+      "tag": "0002_ambitious_maelstrom",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788023203438,
+      "tag": "0003_known_iron_fist",
+      "breakpoints": true
     }
   ]
 }
