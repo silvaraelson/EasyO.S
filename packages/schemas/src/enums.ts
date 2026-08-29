@@ -34,6 +34,21 @@ export const serviceOrderStatusSchema = z.enum([
 ]);
 export type ServiceOrderStatus = z.infer<typeof serviceOrderStatusSchema>;
 
+/** Transições de status permitidas — ver seção 03 do plano (pipeline da OS). */
+export const SERVICE_ORDER_TRANSITIONS: Record<
+  ServiceOrderStatus,
+  ServiceOrderStatus[]
+> = {
+  draft: ["open", "canceled"],
+  open: ["scheduled", "canceled"],
+  scheduled: ["in_progress", "canceled"],
+  in_progress: ["paused", "completed", "canceled"],
+  paused: ["in_progress", "canceled"],
+  completed: ["invoiced"],
+  invoiced: [],
+  canceled: [],
+};
+
 export const paymentMethodSchema = z.enum([
   "cash",
   "pix",

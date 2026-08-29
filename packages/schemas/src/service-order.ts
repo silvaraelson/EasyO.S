@@ -46,6 +46,7 @@ export const createServiceOrderInputSchema = serviceOrderSchema.omit({
   status: true,
   checkInAt: true,
   checkOutAt: true,
+  createdBy: true,
   createdAt: true,
 });
 export type CreateServiceOrderInput = z.infer<

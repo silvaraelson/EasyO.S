@@ -133,8 +133,8 @@ export const addresses = pgTable("addresses", {
   city: text("city").notNull(),
   state: text("state").notNull(),
   zipCode: text("zip_code").notNull(),
-  latitude: numeric("latitude", { precision: 9, scale: 6 }),
-  longitude: numeric("longitude", { precision: 9, scale: 6 }),
+  latitude: numeric("latitude", { precision: 9, scale: 6, mode: "number" }),
+  longitude: numeric("longitude", { precision: 9, scale: 6, mode: "number" }),
 });
 
 export const contacts = pgTable("contacts", {
@@ -166,7 +166,7 @@ export const serviceTypes = pgTable("service_types", {
 
 export const serviceOrders = pgTable("service_orders", {
   id: uuid("id").primaryKey().defaultRandom(),
-  number: integer("number").notNull().unique(),
+  number: integer("number").notNull().unique().generatedAlwaysAsIdentity(),
   serviceTypeId: uuid("service_type_id")
     .notNull()
     .references(() => serviceTypes.id),

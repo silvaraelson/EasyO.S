@@ -13,7 +13,8 @@
     "typecheck": "turbo run typecheck",
     "db:generate": "pnpm --filter @easy-os/api db:generate",
     "db:migrate": "pnpm --filter @easy-os/api db:migrate",
-    "db:studio": "pnpm --filter @easy-os/api db:studio"
+    "db:studio": "pnpm --filter @easy-os/api db:studio",
+    "db:seed": "pnpm --filter @easy-os/api db:seed"
   },
   "devDependencies": {
     "turbo": "^2.3.0",

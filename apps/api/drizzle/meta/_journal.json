@@ -8,6 +8,13 @@
       "when": 1788020203952,
       "tag": "0000_yellow_scarlet_spider",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788020974670,
+      "tag": "0001_cultured_jack_power",
+      "breakpoints": true
     }
   ]
 }
