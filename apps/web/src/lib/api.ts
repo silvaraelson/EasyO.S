@@ -51,6 +51,20 @@ export type ServiceOrderDetail = ServiceOrder & {
 };
 export type BasicUser = { id: string; name: string; email: string; role: UserRole };
 
+export interface DashboardSummary {
+  range: { from: string; to: string };
+  totalOrders: number;
+  ordersByStatus: Record<string, number>;
+  ordersByServiceType: { serviceTypeId: string; name: string; count: number }[];
+  ordersByTechnician: { technicianId: string; name: string; completedCount: number }[];
+  slaCompliance: { met: number; total: number; rate: number | null };
+  avgResolutionHours: number | null;
+  firstTimeFixRate: number | null;
+  ticketMedio: number;
+  totalRevenue: number;
+  invoiceCount: number;
+}
+
 export const api = {
   customers: {
     list: () => apiFetch<Customer[]>("/api/customers"),
@@ -134,5 +148,14 @@ export const api = {
         body: JSON.stringify({ paymentMethod }),
       }),
     invoicePdfUrl: (invoiceId: string) => `${API_URL}/api/invoices/${invoiceId}/pdf`,
+  },
+  dashboard: {
+    summary: (from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      const query = params.toString();
+      return apiFetch<DashboardSummary>(`/api/dashboard/summary${query ? `?${query}` : ""}`);
+    },
   },
 };

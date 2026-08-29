@@ -18,6 +18,7 @@ export function Layout() {
       <header className="app-header">
         <span className="brand">Easy OS</span>
         <nav>
+          <NavLink to="/indicadores">Indicadores</NavLink>
           <NavLink to="/clientes">Clientes</NavLink>
           <NavLink to="/ordens-de-servico">Ordens de Serviço</NavLink>
           {user?.role === "admin" && (

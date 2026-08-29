@@ -10,6 +10,7 @@ import { ServiceOrderNewPage } from "./pages/service-orders/ServiceOrderNewPage"
 import { ServiceOrderDetailPage } from "./pages/service-orders/ServiceOrderDetailPage";
 import { ServiceTypesPage } from "./pages/service-types/ServiceTypesPage";
 import { MaterialsPage } from "./pages/materials/MaterialsPage";
+import { DashboardPage } from "./pages/DashboardPage";
 
 export function App() {
   return (
@@ -18,7 +19,8 @@ export function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<Layout />}>
-          <Route path="/" element={<Navigate to="/clientes" replace />} />
+          <Route path="/" element={<Navigate to="/indicadores" replace />} />
+          <Route path="/indicadores" element={<DashboardPage />} />
           <Route path="/clientes" element={<CustomersListPage />} />
           <Route path="/clientes/novo" element={<CustomerNewPage />} />
           <Route path="/clientes/:id" element={<CustomerDetailPage />} />
