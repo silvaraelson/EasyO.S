@@ -14,3 +14,6 @@ apps/mobile/.expo/
 # editors/os
 .DS_Store
 Thumbs.db
+
+# claude code local state
+.claude/

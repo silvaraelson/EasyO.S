@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     region: oregon
-    buildCommand: npm install -g pnpm@9.15.9 && pnpm install --frozen-lockfile && pnpm --filter @easy-os/api build
+    buildCommand: npm install -g pnpm@9.15.9 && pnpm install --frozen-lockfile && pnpm exec turbo run build --filter=@easy-os/api...
     startCommand: pnpm --filter @easy-os/api start
     envVars:
       - key: NODE_VERSION
