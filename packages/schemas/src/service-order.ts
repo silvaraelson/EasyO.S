@@ -22,6 +22,16 @@ export type ServiceOrderAttachment = z.infer<
   typeof serviceOrderAttachmentSchema
 >;
 
+export const geoPointSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+});
+export type GeoPoint = z.infer<typeof geoPointSchema>;
+
+/** Mapa itemId (do checklist do tipo de serviço) → concluído. */
+export const checklistResultsSchema = z.record(z.string(), z.boolean());
+export type ChecklistResults = z.infer<typeof checklistResultsSchema>;
+
 export const serviceOrderSchema = z.object({
   id: z.string().uuid(),
   number: z.number().int().positive(), // sequencial, exibido ao usuário
@@ -33,7 +43,12 @@ export const serviceOrderSchema = z.object({
   status: serviceOrderStatusSchema,
   scheduledAt: z.coerce.date().optional(),
   checkInAt: z.coerce.date().optional(),
+  checkInLatitude: z.number().min(-90).max(90).optional(),
+  checkInLongitude: z.number().min(-180).max(180).optional(),
   checkOutAt: z.coerce.date().optional(),
+  checkOutLatitude: z.number().min(-90).max(90).optional(),
+  checkOutLongitude: z.number().min(-180).max(180).optional(),
+  checklistResults: checklistResultsSchema.default({}),
   description: z.string().optional(),
   createdBy: z.string().uuid(),
   createdAt: z.coerce.date(),
@@ -45,7 +60,12 @@ export const createServiceOrderInputSchema = serviceOrderSchema.omit({
   number: true,
   status: true,
   checkInAt: true,
+  checkInLatitude: true,
+  checkInLongitude: true,
   checkOutAt: true,
+  checkOutLatitude: true,
+  checkOutLongitude: true,
+  checklistResults: true,
   createdBy: true,
   createdAt: true,
 });
@@ -61,3 +81,24 @@ export const updateServiceOrderStatusInputSchema = z.object({
 export type UpdateServiceOrderStatusInput = z.infer<
   typeof updateServiceOrderStatusInputSchema
 >;
+
+export const checkInInputSchema = z.object({
+  location: geoPointSchema.optional(),
+});
+export type CheckInInput = z.infer<typeof checkInInputSchema>;
+
+export const checkOutInputSchema = z.object({
+  location: geoPointSchema.optional(),
+});
+export type CheckOutInput = z.infer<typeof checkOutInputSchema>;
+
+export const updateChecklistInputSchema = z.object({
+  checklistResults: checklistResultsSchema,
+});
+export type UpdateChecklistInput = z.infer<typeof updateChecklistInputSchema>;
+
+export const createAttachmentInputSchema = z.object({
+  kind: z.enum(["photo", "signature", "document"]),
+  dataUrl: z.string().min(1),
+});
+export type CreateAttachmentInput = z.infer<typeof createAttachmentInputSchema>;

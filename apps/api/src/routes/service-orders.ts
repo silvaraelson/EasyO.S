@@ -1,13 +1,22 @@
 import type { FastifyPluginAsync } from "fastify";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import {
+  checkInInputSchema,
+  checkOutInputSchema,
+  createAttachmentInputSchema,
   createServiceOrderInputSchema,
   SERVICE_ORDER_TRANSITIONS,
   serviceOrderStatusSchema,
+  updateChecklistInputSchema,
 } from "@easy-os/schemas";
 import { db } from "../db/client.js";
-import { addresses, serviceOrderEvents, serviceOrders } from "../db/schema.js";
+import {
+  addresses,
+  serviceOrderAttachments,
+  serviceOrderEvents,
+  serviceOrders,
+} from "../db/schema.js";
 import { requireAuth } from "../lib/guards.js";
 
 const updateStatusBodySchema = z.object({
@@ -19,6 +28,9 @@ const scheduleBodySchema = z.object({
   scheduledAt: z.coerce.date(),
   assignedTechnicianId: z.string().uuid().optional(),
 });
+
+/** OS ainda em aberto para um técnico — o que o app de campo mostra. */
+const TECHNICIAN_OPEN_STATUSES = ["scheduled", "in_progress", "paused"] as const;
 
 export const serviceOrderRoutes: FastifyPluginAsync = async (app) => {
   app.addHook("preHandler", requireAuth);
@@ -40,6 +52,21 @@ export const serviceOrderRoutes: FastifyPluginAsync = async (app) => {
     return db.select().from(serviceOrders).orderBy(desc(serviceOrders.createdAt));
   });
 
+  /** OS do técnico logado, ainda em aberto — a lista do app de campo. */
+  app.get("/service-orders/mine", async (request) => {
+    const currentUser = request.currentUser!;
+    return db
+      .select()
+      .from(serviceOrders)
+      .where(
+        and(
+          eq(serviceOrders.assignedTechnicianId, currentUser.id),
+          inArray(serviceOrders.status, TECHNICIAN_OPEN_STATUSES),
+        ),
+      )
+      .orderBy(serviceOrders.scheduledAt);
+  });
+
   app.get("/service-orders/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
     const [serviceOrder] = await db
@@ -51,13 +78,20 @@ export const serviceOrderRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "OS não encontrada" });
     }
 
-    const events = await db
-      .select()
-      .from(serviceOrderEvents)
-      .where(eq(serviceOrderEvents.serviceOrderId, id))
-      .orderBy(desc(serviceOrderEvents.createdAt));
+    const [events, attachments] = await Promise.all([
+      db
+        .select()
+        .from(serviceOrderEvents)
+        .where(eq(serviceOrderEvents.serviceOrderId, id))
+        .orderBy(desc(serviceOrderEvents.createdAt)),
+      db
+        .select()
+        .from(serviceOrderAttachments)
+        .where(eq(serviceOrderAttachments.serviceOrderId, id))
+        .orderBy(desc(serviceOrderAttachments.createdAt)),
+    ]);
 
-    return { ...serviceOrder, events };
+    return { ...serviceOrder, events, attachments };
   });
 
   app.post("/service-orders", async (request, reply) => {
@@ -168,5 +202,121 @@ export const serviceOrderRoutes: FastifyPluginAsync = async (app) => {
     });
 
     return updated;
+  });
+
+  app.post("/service-orders/:id/check-in", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const input = checkInInputSchema.parse(request.body);
+    const currentUser = request.currentUser!;
+
+    const [current] = await db
+      .select()
+      .from(serviceOrders)
+      .where(eq(serviceOrders.id, id));
+    if (!current) {
+      return reply.code(404).send({ message: "OS não encontrada" });
+    }
+
+    const allowed = SERVICE_ORDER_TRANSITIONS[current.status];
+    if (!allowed.includes("in_progress")) {
+      return reply.code(422).send({
+        message: `Não é possível fazer check-in de uma OS em "${current.status}"`,
+      });
+    }
+
+    const [updated] = await db
+      .update(serviceOrders)
+      .set({
+        status: "in_progress",
+        checkInAt: new Date(),
+        checkInLatitude: input.location?.latitude,
+        checkInLongitude: input.location?.longitude,
+      })
+      .where(eq(serviceOrders.id, id))
+      .returning();
+
+    await db.insert(serviceOrderEvents).values({
+      serviceOrderId: id,
+      status: "in_progress",
+      createdBy: currentUser.id,
+    });
+
+    return updated;
+  });
+
+  app.post("/service-orders/:id/check-out", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const input = checkOutInputSchema.parse(request.body);
+    const currentUser = request.currentUser!;
+
+    const [current] = await db
+      .select()
+      .from(serviceOrders)
+      .where(eq(serviceOrders.id, id));
+    if (!current) {
+      return reply.code(404).send({ message: "OS não encontrada" });
+    }
+
+    const allowed = SERVICE_ORDER_TRANSITIONS[current.status];
+    if (!allowed.includes("completed")) {
+      return reply.code(422).send({
+        message: `Não é possível fazer check-out de uma OS em "${current.status}"`,
+      });
+    }
+
+    const [updated] = await db
+      .update(serviceOrders)
+      .set({
+        status: "completed",
+        checkOutAt: new Date(),
+        checkOutLatitude: input.location?.latitude,
+        checkOutLongitude: input.location?.longitude,
+      })
+      .where(eq(serviceOrders.id, id))
+      .returning();
+
+    await db.insert(serviceOrderEvents).values({
+      serviceOrderId: id,
+      status: "completed",
+      createdBy: currentUser.id,
+    });
+
+    return updated;
+  });
+
+  app.patch("/service-orders/:id/checklist", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const input = updateChecklistInputSchema.parse(request.body);
+
+    const [updated] = await db
+      .update(serviceOrders)
+      .set({ checklistResults: input.checklistResults })
+      .where(eq(serviceOrders.id, id))
+      .returning();
+
+    if (!updated) {
+      return reply.code(404).send({ message: "OS não encontrada" });
+    }
+    return updated;
+  });
+
+  app.post("/service-orders/:id/attachments", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const input = createAttachmentInputSchema.parse(request.body);
+
+    const [serviceOrder] = await db
+      .select({ id: serviceOrders.id })
+      .from(serviceOrders)
+      .where(eq(serviceOrders.id, id));
+    if (!serviceOrder) {
+      return reply.code(404).send({ message: "OS não encontrada" });
+    }
+
+    const [attachment] = await db
+      .insert(serviceOrderAttachments)
+      .values({ serviceOrderId: id, kind: input.kind, url: input.dataUrl })
+      .returning();
+
+    return reply.code(201).send(attachment);
   });
 };

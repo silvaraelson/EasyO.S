@@ -194,7 +194,12 @@ export const serviceOrders = pgTable("service_orders", {
   status: serviceOrderStatusEnum("status").notNull().default("draft"),
   scheduledAt: timestamp("scheduled_at"),
   checkInAt: timestamp("check_in_at"),
+  checkInLatitude: numeric("check_in_latitude", { precision: 9, scale: 6, mode: "number" }),
+  checkInLongitude: numeric("check_in_longitude", { precision: 9, scale: 6, mode: "number" }),
   checkOutAt: timestamp("check_out_at"),
+  checkOutLatitude: numeric("check_out_latitude", { precision: 9, scale: 6, mode: "number" }),
+  checkOutLongitude: numeric("check_out_longitude", { precision: 9, scale: 6, mode: "number" }),
+  checklistResults: jsonb("checklist_results").notNull().default({}),
   description: text("description"),
   createdBy: uuid("created_by")
     .notNull()

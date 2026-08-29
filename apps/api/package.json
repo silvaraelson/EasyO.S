@@ -17,6 +17,7 @@
     "db:seed:prod": "tsx src/db/seed.ts"
   },
   "dependencies": {
+    "@better-auth/expo": "^1.7.2",
     "@easy-os/schemas": "workspace:*",
     "@fastify/cors": "^10.0.0",
     "better-auth": "^1.7.2",
