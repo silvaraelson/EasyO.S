@@ -5,3 +5,4 @@ export * from "./material.js";
 export * from "./service-type.js";
 export * from "./service-order.js";
 export * from "./invoice.js";
+export * from "./sync.js";

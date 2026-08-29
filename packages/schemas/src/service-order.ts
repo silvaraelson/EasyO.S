@@ -52,6 +52,7 @@ export const serviceOrderSchema = z.object({
   description: z.string().optional(),
   createdBy: z.string().uuid(),
   createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
 });
 export type ServiceOrder = z.infer<typeof serviceOrderSchema>;
 
@@ -68,6 +69,7 @@ export const createServiceOrderInputSchema = serviceOrderSchema.omit({
   checklistResults: true,
   createdBy: true,
   createdAt: true,
+  updatedAt: true,
 });
 export type CreateServiceOrderInput = z.infer<
   typeof createServiceOrderInputSchema

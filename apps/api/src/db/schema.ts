@@ -205,6 +205,10 @@ export const serviceOrders = pgTable("service_orders", {
     .notNull()
     .references(() => user.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 });
 
 export const serviceOrderEvents = pgTable("service_order_events", {

@@ -7,6 +7,7 @@ import { customerRoutes } from "./routes/customers.js";
 import { serviceTypeRoutes } from "./routes/service-types.js";
 import { serviceOrderRoutes } from "./routes/service-orders.js";
 import { userRoutes } from "./routes/users.js";
+import { syncRoutes } from "./routes/sync.js";
 
 const app = Fastify({ logger: true });
 
@@ -21,6 +22,7 @@ await app.register(customerRoutes, { prefix: "/api" });
 await app.register(serviceTypeRoutes, { prefix: "/api" });
 await app.register(serviceOrderRoutes, { prefix: "/api" });
 await app.register(userRoutes, { prefix: "/api" });
+await app.register(syncRoutes, { prefix: "/api" });
 
 app
   .listen({ port: env.PORT, host: "0.0.0.0" })
