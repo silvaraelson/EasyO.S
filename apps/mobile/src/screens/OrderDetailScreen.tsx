@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Alert,
@@ -17,6 +18,9 @@ import type { GeoPoint } from "@easy-os/schemas";
 import type { RootStackParamList } from "../navigation";
 import { api } from "../lib/api";
 import { PRIORITY_LABELS, STATUS_LABELS } from "../lib/labels";
+import { database } from "../db/database";
+import { useServiceOrder } from "../db/hooks";
+import { runSync } from "../db/sync";
 
 type Props = NativeStackScreenProps<RootStackParamList, "OrderDetail">;
 
@@ -27,14 +31,18 @@ async function getLocation(): Promise<GeoPoint | undefined> {
   return { latitude: position.coords.latitude, longitude: position.coords.longitude };
 }
 
+/** Salva local (instantâneo, funciona offline) e tenta sincronizar em seguida. */
+function syncInBackground() {
+  runSync().catch(() => {
+    // sem conexão — a mudança fica na fila local e vai na próxima sincronização
+  });
+}
+
 export function OrderDetailScreen({ route }: Props) {
   const { orderId } = route.params;
+  const order = useServiceOrder(orderId);
   const queryClient = useQueryClient();
-
-  const { data: order, isLoading } = useQuery({
-    queryKey: ["service-orders", orderId],
-    queryFn: () => api.serviceOrders.get(orderId),
-  });
+  const [busy, setBusy] = useState<"check-in" | "check-out" | "photo" | null>(null);
 
   const { data: serviceType } = useQuery({
     queryKey: ["service-types"],
@@ -43,32 +51,72 @@ export function OrderDetailScreen({ route }: Props) {
     enabled: Boolean(order),
   });
 
-  function invalidate() {
-    queryClient.invalidateQueries({ queryKey: ["service-orders", orderId] });
-    queryClient.invalidateQueries({ queryKey: ["service-orders", "mine"] });
+  const { data: photos = [] } = useQuery({
+    queryKey: ["service-orders", orderId, "attachments"],
+    queryFn: () => api.serviceOrders.get(orderId),
+    select: (detail) => detail.attachments.filter((attachment) => attachment.kind === "photo"),
+  });
+
+  async function handleCheckIn() {
+    if (!order) return;
+    setBusy("check-in");
+    try {
+      const location = await getLocation();
+      await database.write(async () => {
+        await order.update((record) => {
+          record.status = "in_progress";
+          record.checkInAt = new Date();
+          if (location) {
+            record.checkInLatitude = location.latitude;
+            record.checkInLongitude = location.longitude;
+          }
+        });
+      });
+      syncInBackground();
+    } catch (error) {
+      Alert.alert("Erro no check-in", (error as Error).message);
+    } finally {
+      setBusy(null);
+    }
   }
 
-  const checkInMutation = useMutation({
-    mutationFn: async () => api.serviceOrders.checkIn(orderId, { location: await getLocation() }),
-    onSuccess: invalidate,
-    onError: (err) => Alert.alert("Erro no check-in", (err as Error).message),
-  });
+  async function handleCheckOut() {
+    if (!order) return;
+    setBusy("check-out");
+    try {
+      const location = await getLocation();
+      await database.write(async () => {
+        await order.update((record) => {
+          record.status = "completed";
+          record.checkOutAt = new Date();
+          if (location) {
+            record.checkOutLatitude = location.latitude;
+            record.checkOutLongitude = location.longitude;
+          }
+        });
+      });
+      syncInBackground();
+    } catch (error) {
+      Alert.alert("Erro no check-out", (error as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
 
-  const checkOutMutation = useMutation({
-    mutationFn: async () => api.serviceOrders.checkOut(orderId, { location: await getLocation() }),
-    onSuccess: invalidate,
-    onError: (err) => Alert.alert("Erro no check-out", (err as Error).message),
-  });
+  async function toggleChecklistItem(itemId: string, value: boolean) {
+    if (!order) return;
+    await database.write(async () => {
+      await order.update((record) => {
+        record.checklistResults = { ...record.checklistResults, [itemId]: value };
+      });
+    });
+    syncInBackground();
+  }
 
-  const checklistMutation = useMutation({
-    mutationFn: (results: Record<string, boolean>) =>
-      api.serviceOrders.updateChecklist(orderId, results),
-    onSuccess: invalidate,
-    onError: (err) => Alert.alert("Erro ao salvar checklist", (err as Error).message),
-  });
-
-  const attachmentMutation = useMutation({
-    mutationFn: async () => {
+  async function handleTakePhoto() {
+    if (!order) return;
+    setBusy("photo");
+    try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) throw new Error("Permissão de câmera negada");
 
@@ -77,18 +125,19 @@ export function OrderDetailScreen({ route }: Props) {
       if (result.canceled || !asset?.base64) return;
 
       const dataUrl = `data:image/jpeg;base64,${asset.base64}`;
-      await api.serviceOrders.addAttachment(orderId, { kind: "photo", dataUrl });
-    },
-    onSuccess: invalidate,
-    onError: (err) => Alert.alert("Erro ao anexar foto", (err as Error).message),
-  });
-
-  function toggleChecklistItem(itemId: string, value: boolean) {
-    if (!order) return;
-    checklistMutation.mutate({ ...order.checklistResults, [itemId]: value });
+      await api.serviceOrders.addAttachment(order.id, { kind: "photo", dataUrl });
+      queryClient.invalidateQueries({ queryKey: ["service-orders", orderId, "attachments"] });
+    } catch (error) {
+      Alert.alert(
+        "Erro ao anexar foto",
+        `${(error as Error).message} — fotos exigem conexão, tente de novo quando tiver sinal.`,
+      );
+    } finally {
+      setBusy(null);
+    }
   }
 
-  if (isLoading || !order) {
+  if (!order) {
     return (
       <View style={styles.center}>
         <ActivityIndicator />
@@ -98,24 +147,20 @@ export function OrderDetailScreen({ route }: Props) {
 
   const canCheckIn = order.status === "scheduled";
   const canCheckOut = order.status === "in_progress" || order.status === "paused";
-  const photos = order.attachments.filter((attachment) => attachment.kind === "photo");
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>OS #{order.number}</Text>
       <Text style={styles.meta}>
-        {STATUS_LABELS[order.status]} · {PRIORITY_LABELS[order.priority]}
+        {STATUS_LABELS[order.status as keyof typeof STATUS_LABELS] ?? order.status} ·{" "}
+        {PRIORITY_LABELS[order.priority as keyof typeof PRIORITY_LABELS] ?? order.priority}
       </Text>
       {order.description && <Text style={styles.description}>{order.description}</Text>}
 
       {canCheckIn && (
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => checkInMutation.mutate()}
-          disabled={checkInMutation.isPending}
-        >
+        <TouchableOpacity style={styles.button} onPress={handleCheckIn} disabled={busy === "check-in"}>
           <Text style={styles.buttonText}>
-            {checkInMutation.isPending ? "Fazendo check-in…" : "Check-in"}
+            {busy === "check-in" ? "Fazendo check-in…" : "Check-in"}
           </Text>
         </TouchableOpacity>
       )}
@@ -144,25 +189,17 @@ export function OrderDetailScreen({ route }: Props) {
             ))}
           </View>
         )}
-        <TouchableOpacity
-          style={styles.buttonSecondary}
-          onPress={() => attachmentMutation.mutate()}
-          disabled={attachmentMutation.isPending}
-        >
+        <TouchableOpacity style={styles.buttonSecondary} onPress={handleTakePhoto} disabled={busy === "photo"}>
           <Text style={styles.buttonSecondaryText}>
-            {attachmentMutation.isPending ? "Enviando…" : "Tirar foto"}
+            {busy === "photo" ? "Enviando…" : "Tirar foto"}
           </Text>
         </TouchableOpacity>
       </View>
 
       {canCheckOut && (
-        <TouchableOpacity
-          style={styles.button}
-          onPress={() => checkOutMutation.mutate()}
-          disabled={checkOutMutation.isPending}
-        >
+        <TouchableOpacity style={styles.button} onPress={handleCheckOut} disabled={busy === "check-out"}>
           <Text style={styles.buttonText}>
-            {checkOutMutation.isPending ? "Fazendo check-out…" : "Concluir (check-out)"}
+            {busy === "check-out" ? "Fazendo check-out…" : "Concluir (check-out)"}
           </Text>
         </TouchableOpacity>
       )}

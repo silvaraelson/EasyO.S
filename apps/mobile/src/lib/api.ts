@@ -1,7 +1,4 @@
 import type {
-  CheckInInput,
-  CheckOutInput,
-  ChecklistResults,
   CreateAttachmentInput,
   ServiceOrder,
   ServiceOrderAttachment,
@@ -37,25 +34,14 @@ export type ServiceOrderDetail = ServiceOrder & {
   attachments: ServiceOrderAttachment[];
 };
 
+/**
+ * Chamadas diretas à API — hoje só para o que ainda não passa pelo sync do
+ * WatermelonDB (tipos de serviço, fotos). Check-in/out e checklist vão pela
+ * fila de sync local (ver src/db/sync.ts), não por aqui.
+ */
 export const api = {
   serviceOrders: {
-    mine: () => apiFetch<ServiceOrder[]>("/api/service-orders/mine"),
     get: (id: string) => apiFetch<ServiceOrderDetail>(`/api/service-orders/${id}`),
-    checkIn: (id: string, input: CheckInInput) =>
-      apiFetch<ServiceOrder>(`/api/service-orders/${id}/check-in`, {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    checkOut: (id: string, input: CheckOutInput) =>
-      apiFetch<ServiceOrder>(`/api/service-orders/${id}/check-out`, {
-        method: "POST",
-        body: JSON.stringify(input),
-      }),
-    updateChecklist: (id: string, checklistResults: ChecklistResults) =>
-      apiFetch<ServiceOrder>(`/api/service-orders/${id}/checklist`, {
-        method: "PATCH",
-        body: JSON.stringify({ checklistResults }),
-      }),
     addAttachment: (id: string, input: CreateAttachmentInput) =>
       apiFetch<ServiceOrderAttachment>(`/api/service-orders/${id}/attachments`, {
         method: "POST",
@@ -64,9 +50,5 @@ export const api = {
   },
   serviceTypes: {
     list: () => apiFetch<ServiceType[]>("/api/service-types"),
-  },
-  customers: {
-    get: (id: string) =>
-      apiFetch<{ id: string; name: string; document: string }>(`/api/customers/${id}`),
   },
 };

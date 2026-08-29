@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useState } from "react";
 import {
   FlatList,
   RefreshControl,
@@ -9,36 +9,46 @@ import {
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation";
-import { api } from "../lib/api";
 import { authClient } from "../lib/auth-client";
 import { PRIORITY_LABELS, STATUS_LABELS } from "../lib/labels";
+import { useServiceOrders } from "../db/hooks";
+import { runSync } from "../db/sync";
+import { useSyncStatus } from "../db/sync-status";
 
 type Props = NativeStackScreenProps<RootStackParamList, "TodayOrders">;
 
 export function TodayOrdersScreen({ navigation }: Props) {
-  const {
-    data: orders,
-    isLoading,
-    error,
-    refetch,
-    isRefetching,
-  } = useQuery({
-    queryKey: ["service-orders", "mine"],
-    queryFn: api.serviceOrders.mine,
-  });
+  const orders = useServiceOrders();
+  const syncStatus = useSyncStatus();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const sync = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await runSync();
+    } catch {
+      // erro já fica registrado no syncStatus — a lista local continua utilizável
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    sync();
+  }, [sync]);
 
   return (
     <View style={styles.container}>
-      {isLoading && <Text style={styles.muted}>Carregando…</Text>}
-      {error && <Text style={styles.error}>{(error as Error).message}</Text>}
-      {orders && orders.length === 0 && (
+      <SyncBanner status={syncStatus.status} lastSyncedAt={syncStatus.lastSyncedAt} />
+
+      {orders.length === 0 && !refreshing && (
         <Text style={styles.muted}>Nenhuma OS em aberto pra você.</Text>
       )}
 
       <FlatList
-        data={orders ?? []}
+        data={orders}
         keyExtractor={(item) => item.id}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={sync} />}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <TouchableOpacity
@@ -47,12 +57,11 @@ export function TodayOrdersScreen({ navigation }: Props) {
           >
             <Text style={styles.cardTitle}>OS #{item.number}</Text>
             <Text style={styles.cardMeta}>
-              {STATUS_LABELS[item.status]} · {PRIORITY_LABELS[item.priority]}
+              {STATUS_LABELS[item.status as keyof typeof STATUS_LABELS] ?? item.status} ·{" "}
+              {PRIORITY_LABELS[item.priority as keyof typeof PRIORITY_LABELS] ?? item.priority}
             </Text>
             {item.scheduledAt && (
-              <Text style={styles.cardMeta}>
-                {new Date(item.scheduledAt).toLocaleString("pt-BR")}
-              </Text>
+              <Text style={styles.cardMeta}>{item.scheduledAt.toLocaleString("pt-BR")}</Text>
             )}
           </TouchableOpacity>
         )}
@@ -65,10 +74,62 @@ export function TodayOrdersScreen({ navigation }: Props) {
   );
 }
 
+function SyncBanner({
+  status,
+  lastSyncedAt,
+}: {
+  status: "idle" | "syncing" | "synced" | "error";
+  lastSyncedAt: Date | null;
+}) {
+  if (status === "syncing") {
+    return (
+      <View style={[styles.syncBanner, styles.syncBannerNeutral]}>
+        <Text style={styles.syncBannerText}>Sincronizando…</Text>
+      </View>
+    );
+  }
+  if (status === "error") {
+    return (
+      <View style={[styles.syncBanner, styles.syncBannerError]}>
+        <Text style={styles.syncBannerText}>
+          Sem conexão — mostrando dados salvos no aparelho
+        </Text>
+      </View>
+    );
+  }
+  if (status === "synced" && lastSyncedAt) {
+    return (
+      <View style={[styles.syncBanner, styles.syncBannerOk]}>
+        <Text style={styles.syncBannerText}>
+          Sincronizado às {lastSyncedAt.toLocaleTimeString("pt-BR")}
+        </Text>
+      </View>
+    );
+  }
+  return null;
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  syncBanner: {
+    paddingVertical: 6,
+    alignItems: "center",
+  },
+  syncBannerNeutral: {
+    backgroundColor: "#f2f2ee",
+  },
+  syncBannerOk: {
+    backgroundColor: "#dcece8",
+  },
+  syncBannerError: {
+    backgroundColor: "#f6dede",
+  },
+  syncBannerText: {
+    fontSize: 12,
+    color: "#444",
   },
   list: {
     padding: 16,
@@ -77,10 +138,6 @@ const styles = StyleSheet.create({
   muted: {
     padding: 16,
     color: "#666",
-  },
-  error: {
-    padding: 16,
-    color: "#b23a3a",
   },
   card: {
     borderWidth: 1,
