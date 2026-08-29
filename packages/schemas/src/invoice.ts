@@ -27,3 +27,24 @@ export const invoiceSchema = z.object({
   createdAt: z.coerce.date(),
 });
 export type Invoice = z.infer<typeof invoiceSchema>;
+
+export const createBudgetItemInputSchema = budgetItemSchema.omit({
+  id: true,
+  budgetId: true,
+});
+export type CreateBudgetItemInput = z.infer<typeof createBudgetItemInputSchema>;
+
+export const createBudgetInputSchema = z.object({
+  items: z.array(createBudgetItemInputSchema).min(1),
+});
+export type CreateBudgetInput = z.infer<typeof createBudgetInputSchema>;
+
+export const createInvoiceInputSchema = z.object({
+  paymentMethod: paymentMethodSchema.optional(),
+});
+export type CreateInvoiceInput = z.infer<typeof createInvoiceInputSchema>;
+
+export const payInvoiceInputSchema = z.object({
+  paymentMethod: paymentMethodSchema,
+});
+export type PayInvoiceInput = z.infer<typeof payInvoiceInputSchema>;

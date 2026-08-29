@@ -13,8 +13,12 @@ import {
 import { db } from "../db/client.js";
 import {
   addresses,
+  budgetItems,
+  budgets,
+  invoices,
   serviceOrderAttachments,
   serviceOrderEvents,
+  serviceOrderMaterials,
   serviceOrders,
 } from "../db/schema.js";
 import { requireAuth } from "../lib/guards.js";
@@ -78,7 +82,7 @@ export const serviceOrderRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "OS não encontrada" });
     }
 
-    const [events, attachments] = await Promise.all([
+    const [events, attachments, materialsUsed, [budget], [invoice]] = await Promise.all([
       db
         .select()
         .from(serviceOrderEvents)
@@ -89,9 +93,23 @@ export const serviceOrderRoutes: FastifyPluginAsync = async (app) => {
         .from(serviceOrderAttachments)
         .where(eq(serviceOrderAttachments.serviceOrderId, id))
         .orderBy(desc(serviceOrderAttachments.createdAt)),
+      db.select().from(serviceOrderMaterials).where(eq(serviceOrderMaterials.serviceOrderId, id)),
+      db.select().from(budgets).where(eq(budgets.serviceOrderId, id)),
+      db.select().from(invoices).where(eq(invoices.serviceOrderId, id)),
     ]);
 
-    return { ...serviceOrder, events, attachments };
+    const budgetItemsList = budget
+      ? await db.select().from(budgetItems).where(eq(budgetItems.budgetId, budget.id))
+      : [];
+
+    return {
+      ...serviceOrder,
+      events,
+      attachments,
+      materialsUsed,
+      budget: budget ? { ...budget, items: budgetItemsList } : null,
+      invoice: invoice ?? null,
+    };
   });
 
   app.post("/service-orders", async (request, reply) => {

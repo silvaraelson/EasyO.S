@@ -23,6 +23,9 @@ export function Layout() {
           {user?.role === "admin" && (
             <NavLink to="/tipos-de-servico">Tipos de Serviço</NavLink>
           )}
+          {(user?.role === "admin" || user?.role === "manager") && (
+            <NavLink to="/materiais">Materiais</NavLink>
+          )}
         </nav>
         {user && (
           <div className="user-menu">

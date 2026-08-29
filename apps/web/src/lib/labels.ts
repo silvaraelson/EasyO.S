@@ -1,4 +1,4 @@
-import type { Priority, ServiceOrderStatus, UserRole } from "@easy-os/schemas";
+import type { PaymentMethod, Priority, ServiceOrderStatus, UserRole } from "@easy-os/schemas";
 
 export const STATUS_LABELS: Record<ServiceOrderStatus, string> = {
   draft: "Rascunho",
@@ -24,3 +24,16 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   attendant: "Atendente",
   technician: "Técnico",
 };
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: "Dinheiro",
+  pix: "Pix",
+  credit_card: "Cartão de crédito",
+  debit_card: "Cartão de débito",
+  bank_slip: "Boleto",
+  invoice_on_file: "Faturado (a prazo)",
+};
+
+export function formatCurrency(cents: number) {
+  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}

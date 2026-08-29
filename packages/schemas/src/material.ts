@@ -21,3 +21,11 @@ export const serviceOrderMaterialSchema = z.object({
   unitPrice: z.number().nonnegative(), // em centavos, no momento do uso
 });
 export type ServiceOrderMaterial = z.infer<typeof serviceOrderMaterialSchema>;
+
+export const addServiceOrderMaterialInputSchema = z.object({
+  materialId: z.string().uuid(),
+  quantity: z.number().int().positive(),
+});
+export type AddServiceOrderMaterialInput = z.infer<
+  typeof addServiceOrderMaterialInputSchema
+>;

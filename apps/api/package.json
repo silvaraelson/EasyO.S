@@ -20,14 +20,17 @@
     "@better-auth/expo": "^1.7.2",
     "@easy-os/schemas": "workspace:*",
     "@fastify/cors": "^10.0.0",
+    "@react-pdf/renderer": "^4.9.0",
     "better-auth": "^1.7.2",
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.2.0",
     "postgres": "^3.4.0",
+    "react": "^19.2.0",
     "zod": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "@types/react": "^19.2.0",
     "dotenv-cli": "^7.4.0",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.19.0",

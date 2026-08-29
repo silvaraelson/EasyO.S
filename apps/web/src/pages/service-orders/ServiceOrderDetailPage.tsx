@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { SERVICE_ORDER_TRANSITIONS, type ServiceOrderStatus } from "@easy-os/schemas";
 import { api } from "../../lib/api";
 import { PRIORITY_LABELS, STATUS_LABELS } from "../../lib/labels";
+import { FinanceSection } from "./FinanceSection";
 
 export function ServiceOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -159,6 +160,8 @@ export function ServiceOrderDetailPage() {
           </ul>
         </div>
       </div>
+
+      <FinanceSection serviceOrderId={id!} serviceOrder={serviceOrder} />
     </section>
   );
 }

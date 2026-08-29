@@ -278,7 +278,7 @@ export const budgetItems = pgTable("budget_items", {
     .notNull()
     .references(() => budgets.id, { onDelete: "cascade" }),
   description: text("description").notNull(),
-  quantity: numeric("quantity", { precision: 10, scale: 2 }).notNull(),
+  quantity: numeric("quantity", { precision: 10, scale: 2, mode: "number" }).notNull(),
   unitPrice: integer("unit_price").notNull(), // em centavos
 });
 

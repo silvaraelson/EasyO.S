@@ -1,12 +1,20 @@
 import type {
   Address,
+  Budget,
   Contact,
+  CreateBudgetInput,
   CreateCustomerInput,
+  CreateMaterialInput,
   CreateServiceOrderInput,
   CreateServiceTypeInput,
   Customer,
+  Invoice,
+  Material,
+  PaymentMethod,
   ServiceOrder,
+  ServiceOrderAttachment,
   ServiceOrderEvent,
+  ServiceOrderMaterial,
   ServiceOrderStatus,
   ServiceType,
   UserRole,
@@ -34,7 +42,13 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export type CustomerDetail = Customer & { addresses: Address[]; contacts: Contact[] };
-export type ServiceOrderDetail = ServiceOrder & { events: ServiceOrderEvent[] };
+export type ServiceOrderDetail = ServiceOrder & {
+  events: ServiceOrderEvent[];
+  attachments: ServiceOrderAttachment[];
+  materialsUsed: ServiceOrderMaterial[];
+  budget: (Budget & { items: { id: string; description: string; quantity: number; unitPrice: number }[] }) | null;
+  invoice: Invoice | null;
+};
 export type BasicUser = { id: string; name: string; email: string; role: UserRole };
 
 export const api = {
@@ -87,5 +101,38 @@ export const api = {
   },
   users: {
     list: (role?: UserRole) => apiFetch<BasicUser[]>(`/api/users${role ? `?role=${role}` : ""}`),
+  },
+  materials: {
+    list: () => apiFetch<Material[]>("/api/materials"),
+    create: (input: CreateMaterialInput) =>
+      apiFetch<Material>("/api/materials", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+  },
+  finance: {
+    addMaterialUsage: (serviceOrderId: string, materialId: string, quantity: number) =>
+      apiFetch<ServiceOrderMaterial>(`/api/service-orders/${serviceOrderId}/materials`, {
+        method: "POST",
+        body: JSON.stringify({ materialId, quantity }),
+      }),
+    createBudget: (serviceOrderId: string, input: CreateBudgetInput) =>
+      apiFetch<Budget>(`/api/service-orders/${serviceOrderId}/budget`, {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    approveBudget: (budgetId: string) =>
+      apiFetch<Budget>(`/api/budgets/${budgetId}/approve`, { method: "POST" }),
+    createInvoice: (serviceOrderId: string, paymentMethod?: PaymentMethod) =>
+      apiFetch<Invoice>(`/api/service-orders/${serviceOrderId}/invoice`, {
+        method: "POST",
+        body: JSON.stringify({ paymentMethod }),
+      }),
+    payInvoice: (invoiceId: string, paymentMethod: PaymentMethod) =>
+      apiFetch<Invoice>(`/api/invoices/${invoiceId}/pay`, {
+        method: "POST",
+        body: JSON.stringify({ paymentMethod }),
+      }),
+    invoicePdfUrl: (invoiceId: string) => `${API_URL}/api/invoices/${invoiceId}/pdf`,
   },
 };

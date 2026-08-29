@@ -9,6 +9,7 @@ import { ServiceOrdersListPage } from "./pages/service-orders/ServiceOrdersListP
 import { ServiceOrderNewPage } from "./pages/service-orders/ServiceOrderNewPage";
 import { ServiceOrderDetailPage } from "./pages/service-orders/ServiceOrderDetailPage";
 import { ServiceTypesPage } from "./pages/service-types/ServiceTypesPage";
+import { MaterialsPage } from "./pages/materials/MaterialsPage";
 
 export function App() {
   return (
@@ -25,6 +26,7 @@ export function App() {
           <Route path="/ordens-de-servico/nova" element={<ServiceOrderNewPage />} />
           <Route path="/ordens-de-servico/:id" element={<ServiceOrderDetailPage />} />
           <Route path="/tipos-de-servico" element={<ServiceTypesPage />} />
+          <Route path="/materiais" element={<MaterialsPage />} />
         </Route>
       </Route>
     </Routes>
