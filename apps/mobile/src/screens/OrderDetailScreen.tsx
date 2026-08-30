@@ -45,7 +45,7 @@ function syncInBackground() {
   });
 }
 
-export function OrderDetailScreen({ route }: Props) {
+export function OrderDetailScreen({ route, navigation }: Props) {
   const { orderId } = route.params;
   const order = useServiceOrder(orderId);
   const queryClient = useQueryClient();
@@ -202,6 +202,7 @@ export function OrderDetailScreen({ route }: Props) {
         });
       });
       syncInBackground();
+      navigation.navigate("TodayOrders");
     } catch (error) {
       Alert.alert("Erro ao finalizar a OS", (error as Error).message);
     } finally {
@@ -264,6 +265,7 @@ export function OrderDetailScreen({ route }: Props) {
   }
 
   const canCheckOut = order.status === "in_progress" || order.status === "paused";
+  const reportLocked = ["completed", "invoiced", "canceled"].includes(order.status);
 
   return (
     <KeyboardAvoidingView
@@ -344,16 +346,22 @@ export function OrderDetailScreen({ route }: Props) {
         <View style={styles.section}>
           <View style={styles.reportHeader}>
             <Text style={styles.sectionTitle}>Relato</Text>
-            {reportStatus === "saving" && <Text style={styles.reportStatus}>Salvando…</Text>}
-            {reportStatus === "saved" && <Text style={styles.reportStatus}>Salvo</Text>}
+            {reportLocked && <Text style={styles.reportStatus}>OS finalizada</Text>}
+            {!reportLocked && reportStatus === "saving" && (
+              <Text style={styles.reportStatus}>Salvando…</Text>
+            )}
+            {!reportLocked && reportStatus === "saved" && (
+              <Text style={styles.reportStatus}>Salvo</Text>
+            )}
           </View>
           <TextInput
-            style={styles.reportInput}
+            style={[styles.reportInput, reportLocked && styles.reportInputLocked]}
             multiline
             numberOfLines={4}
             placeholder="O que foi encontrado e o que foi feito…"
             value={technicalReport}
             onChangeText={handleReportChange}
+            editable={!reportLocked}
           />
         </View>
 
@@ -370,7 +378,10 @@ export function OrderDetailScreen({ route }: Props) {
         transparent
         onRequestClose={closeMaterialModal}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <View style={styles.modalCard}>
             {!pendingMaterial ? (
               <>
@@ -415,7 +426,7 @@ export function OrderDetailScreen({ route }: Props) {
               </>
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       <Modal
@@ -552,6 +563,10 @@ const styles = StyleSheet.create({
     minHeight: 90,
     textAlignVertical: "top",
     fontSize: 15,
+  },
+  reportInputLocked: {
+    backgroundColor: "#f2f2ee",
+    color: "#888",
   },
   modalOverlay: {
     flex: 1,

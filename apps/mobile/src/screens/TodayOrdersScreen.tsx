@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   FlatList,
   RefreshControl,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../navigation";
 import { authClient } from "../lib/auth-client";
@@ -33,9 +34,11 @@ export function TodayOrdersScreen({ navigation }: Props) {
     }
   }, []);
 
-  useEffect(() => {
-    sync();
-  }, [sync]);
+  useFocusEffect(
+    useCallback(() => {
+      sync();
+    }, [sync]),
+  );
 
   return (
     <View style={styles.container}>

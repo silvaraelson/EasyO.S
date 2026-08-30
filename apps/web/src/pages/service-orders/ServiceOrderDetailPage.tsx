@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { SERVICE_ORDER_TRANSITIONS, type ServiceOrderStatus } from "@easy-os/schemas";
 import { api } from "../../lib/api";
 import { PRIORITY_LABELS, STATUS_LABELS } from "../../lib/labels";
 import { FinanceSection } from "./FinanceSection";
 
+const LOCKED_REPORT_STATUSES: ServiceOrderStatus[] = ["completed", "invoiced", "canceled"];
+
 export function ServiceOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: serviceOrder, isLoading, error } = useQuery({
@@ -32,7 +35,12 @@ export function ServiceOrderDetailPage() {
 
   const statusMutation = useMutation({
     mutationFn: (status: ServiceOrderStatus) => api.serviceOrders.updateStatus(id!, status),
-    onSuccess: invalidate,
+    onSuccess: (_data, status) => {
+      invalidate();
+      if (status === "completed") {
+        navigate("/ordens-de-servico");
+      }
+    },
   });
 
   const scheduleMutation = useMutation({
@@ -64,6 +72,7 @@ export function ServiceOrderDetailPage() {
   if (!serviceOrder) return null;
 
   const photos = serviceOrder.attachments.filter((attachment) => attachment.kind === "photo");
+  const reportLocked = LOCKED_REPORT_STATUSES.includes(serviceOrder.status);
 
   return (
     <section>
@@ -163,7 +172,10 @@ export function ServiceOrderDetailPage() {
               technicalReportMutation.mutate();
             }}
           >
-            <h3>Laudo técnico</h3>
+            <h3>
+              Laudo técnico
+              {reportLocked && <span className="muted"> — OS finalizada, laudo travado</span>}
+            </h3>
             <label>
               Diagnóstico e serviço executado
               <textarea
@@ -171,15 +183,18 @@ export function ServiceOrderDetailPage() {
                 value={technicalReport}
                 onChange={(event) => setTechnicalReport(event.target.value)}
                 placeholder="O que foi encontrado e o que foi feito…"
+                disabled={reportLocked}
               />
             </label>
             {technicalReportMutation.isError && (
               <p className="form-error">{(technicalReportMutation.error as Error).message}</p>
             )}
             <div className="form-row">
-              <button type="submit" disabled={technicalReportMutation.isPending}>
-                {technicalReportMutation.isPending ? "Salvando…" : "Salvar laudo"}
-              </button>
+              {!reportLocked && (
+                <button type="submit" disabled={technicalReportMutation.isPending}>
+                  {technicalReportMutation.isPending ? "Salvando…" : "Salvar laudo"}
+                </button>
+              )}
               <a
                 className="button-secondary"
                 href={api.finance.technicalReportPdfUrl(id!)}
