@@ -21,11 +21,15 @@ export function Layout() {
           <NavLink to="/indicadores">Indicadores</NavLink>
           <NavLink to="/clientes">Clientes</NavLink>
           <NavLink to="/ordens-de-servico">Ordens de Serviço</NavLink>
+          <NavLink to="/agenda">Agenda</NavLink>
           {user?.role === "admin" && (
             <NavLink to="/tipos-de-servico">Tipos de Serviço</NavLink>
           )}
           {(user?.role === "admin" || user?.role === "manager") && (
             <NavLink to="/materiais">Materiais</NavLink>
+          )}
+          {user?.role === "admin" && (
+            <NavLink to="/configuracoes">Configurações</NavLink>
           )}
         </nav>
         {user && (

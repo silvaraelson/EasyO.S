@@ -1,10 +1,11 @@
 import type { FastifyPluginAsync } from "fastify";
-import { and, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { SLA_HOURS_BY_PRIORITY } from "@easy-os/schemas";
 import { db } from "../db/client.js";
 import {
   invoices,
+  materials,
   serviceOrderEvents,
   serviceOrders,
   serviceTypes,
@@ -119,6 +120,22 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
     const totalRevenue = orderInvoices.reduce((sum, invoice) => sum + invoice.totalAmount, 0);
     const ticketMedio = orderInvoices.length > 0 ? totalRevenue / orderInvoices.length : 0;
 
+    const lowStockMaterials = await db
+      .select({
+        id: materials.id,
+        sku: materials.sku,
+        description: materials.description,
+        stockQuantity: materials.stockQuantity,
+        lowStockThreshold: materials.lowStockThreshold,
+      })
+      .from(materials)
+      .where(
+        and(
+          isNotNull(materials.lowStockThreshold),
+          sql`${materials.stockQuantity} <= ${materials.lowStockThreshold}`,
+        ),
+      );
+
     return {
       range: { from: rangeStart.toISOString(), to: rangeEnd.toISOString() },
       totalOrders: orders.length,
@@ -137,6 +154,7 @@ export const dashboardRoutes: FastifyPluginAsync = async (app) => {
       ticketMedio,
       totalRevenue,
       invoiceCount: orderInvoices.length,
+      lowStockMaterials,
     };
   });
 };

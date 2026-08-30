@@ -6,3 +6,4 @@ export * from "./service-type.js";
 export * from "./service-order.js";
 export * from "./invoice.js";
 export * from "./sync.js";
+export * from "./company-settings.js";

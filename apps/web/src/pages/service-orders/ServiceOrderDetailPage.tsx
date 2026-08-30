@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { SERVICE_ORDER_TRANSITIONS, type ServiceOrderStatus } from "@easy-os/schemas";
@@ -23,6 +23,7 @@ export function ServiceOrderDetailPage() {
 
   const [scheduledAt, setScheduledAt] = useState("");
   const [technicianId, setTechnicianId] = useState("");
+  const [technicalReport, setTechnicalReport] = useState("");
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["service-orders", id] });
@@ -41,6 +42,15 @@ export function ServiceOrderDetailPage() {
         new Date(scheduledAt).toISOString(),
         technicianId || undefined,
       ),
+    onSuccess: invalidate,
+  });
+
+  useEffect(() => {
+    setTechnicalReport(serviceOrder?.technicalReport ?? "");
+  }, [serviceOrder?.technicalReport]);
+
+  const technicalReportMutation = useMutation({
+    mutationFn: () => api.serviceOrders.updateTechnicalReport(id!, technicalReport),
     onSuccess: invalidate,
   });
 
@@ -143,6 +153,41 @@ export function ServiceOrderDetailPage() {
           {statusMutation.isError && (
             <p className="form-error">{(statusMutation.error as Error).message}</p>
           )}
+
+          <form
+            className="form"
+            onSubmit={(event: FormEvent) => {
+              event.preventDefault();
+              technicalReportMutation.mutate();
+            }}
+          >
+            <h3>Laudo técnico</h3>
+            <label>
+              Diagnóstico e serviço executado
+              <textarea
+                rows={4}
+                value={technicalReport}
+                onChange={(event) => setTechnicalReport(event.target.value)}
+                placeholder="O que foi encontrado e o que foi feito…"
+              />
+            </label>
+            {technicalReportMutation.isError && (
+              <p className="form-error">{(technicalReportMutation.error as Error).message}</p>
+            )}
+            <div className="form-row">
+              <button type="submit" disabled={technicalReportMutation.isPending}>
+                {technicalReportMutation.isPending ? "Salvando…" : "Salvar laudo"}
+              </button>
+              <a
+                className="button-secondary"
+                href={api.finance.technicalReportPdfUrl(id!)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Baixar laudo (PDF)
+              </a>
+            </div>
+          </form>
         </div>
 
         <div className="card">

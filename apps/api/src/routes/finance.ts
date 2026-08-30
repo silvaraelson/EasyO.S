@@ -20,9 +20,26 @@ import {
   serviceOrderEvents,
   serviceOrderMaterials,
   serviceOrders,
+  serviceTypes,
+  user,
 } from "../db/schema.js";
+import { getOrCreateCompanySettings } from "../lib/company-settings.js";
 import { requireAuth, requireRole } from "../lib/guards.js";
 import { InvoicePdfDocument } from "../pdf/invoice-document.js";
+import { MaterialsListPdfDocument } from "../pdf/materials-list-document.js";
+import { TechnicalReportPdfDocument } from "../pdf/technical-report-document.js";
+import type { CompanyInfo } from "../pdf/shared.js";
+
+function toCompanyInfo(settings: Awaited<ReturnType<typeof getOrCreateCompanySettings>>): CompanyInfo {
+  return {
+    name: settings.name,
+    document: settings.document,
+    phone: settings.phone,
+    email: settings.email,
+    logoDataUrl: settings.logoDataUrl,
+    signatureDataUrl: settings.signatureDataUrl,
+  };
+}
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   cash: "Dinheiro",
@@ -241,8 +258,11 @@ export const financeRoutes: FastifyPluginAsync = async (app) => {
       })),
     ];
 
+    const company = toCompanyInfo(await getOrCreateCompanySettings());
+
     const buffer = await renderToBuffer(
       InvoicePdfDocument({
+        company,
         serviceOrderNumber: serviceOrder.number,
         issuedAt: invoice.createdAt,
         paidAt: invoice.paidAt,
@@ -261,6 +281,89 @@ export const financeRoutes: FastifyPluginAsync = async (app) => {
 
     reply.header("Content-Type", "application/pdf");
     reply.header("Content-Disposition", `inline; filename="fatura-os-${serviceOrder.number}.pdf"`);
+    return reply.send(buffer);
+  });
+
+  app.get("/service-orders/:id/pdf/laudo-tecnico", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const [serviceOrder] = await db.select().from(serviceOrders).where(eq(serviceOrders.id, id));
+    if (!serviceOrder) {
+      return reply.code(404).send({ message: "OS não encontrada" });
+    }
+
+    const [[customer], [address], [serviceType], [technician], company] = await Promise.all([
+      db.select().from(customers).where(eq(customers.id, serviceOrder.customerId)),
+      db.select().from(addresses).where(eq(addresses.id, serviceOrder.addressId)),
+      db.select().from(serviceTypes).where(eq(serviceTypes.id, serviceOrder.serviceTypeId)),
+      serviceOrder.assignedTechnicianId
+        ? db.select().from(user).where(eq(user.id, serviceOrder.assignedTechnicianId))
+        : Promise.resolve([]),
+      getOrCreateCompanySettings(),
+    ]);
+
+    const buffer = await renderToBuffer(
+      TechnicalReportPdfDocument({
+        company: toCompanyInfo(company),
+        serviceOrderNumber: serviceOrder.number,
+        serviceTypeName: serviceType?.name ?? "—",
+        customerName: customer?.name ?? "Cliente",
+        customerDocument: customer?.document ?? "",
+        addressLine: address
+          ? `${address.street}, ${address.number} — ${address.city}/${address.state}`
+          : "",
+        technicianName: technician?.name,
+        checkInAt: serviceOrder.checkInAt,
+        checkOutAt: serviceOrder.checkOutAt,
+        description: serviceOrder.description ?? undefined,
+        technicalReport: serviceOrder.technicalReport ?? undefined,
+      }),
+    );
+
+    reply.header("Content-Type", "application/pdf");
+    reply.header(
+      "Content-Disposition",
+      `inline; filename="laudo-tecnico-os-${serviceOrder.number}.pdf"`,
+    );
+    return reply.send(buffer);
+  });
+
+  app.get("/service-orders/:id/pdf/lista-materiais", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const [serviceOrder] = await db.select().from(serviceOrders).where(eq(serviceOrders.id, id));
+    if (!serviceOrder) {
+      return reply.code(404).send({ message: "OS não encontrada" });
+    }
+
+    const [[customer], materialRows, company] = await Promise.all([
+      db.select().from(customers).where(eq(customers.id, serviceOrder.customerId)),
+      db
+        .select({
+          sku: materials.sku,
+          description: materials.description,
+          unit: materials.unit,
+          quantity: serviceOrderMaterials.quantity,
+          unitPrice: serviceOrderMaterials.unitPrice,
+        })
+        .from(serviceOrderMaterials)
+        .innerJoin(materials, eq(serviceOrderMaterials.materialId, materials.id))
+        .where(eq(serviceOrderMaterials.serviceOrderId, id)),
+      getOrCreateCompanySettings(),
+    ]);
+
+    const buffer = await renderToBuffer(
+      MaterialsListPdfDocument({
+        company: toCompanyInfo(company),
+        serviceOrderNumber: serviceOrder.number,
+        customerName: customer?.name ?? "Cliente",
+        items: materialRows,
+      }),
+    );
+
+    reply.header("Content-Type", "application/pdf");
+    reply.header(
+      "Content-Disposition",
+      `inline; filename="lista-materiais-os-${serviceOrder.number}.pdf"`,
+    );
     return reply.send(buffer);
   });
 };

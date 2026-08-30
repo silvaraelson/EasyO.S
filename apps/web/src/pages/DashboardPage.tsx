@@ -50,6 +50,20 @@ export function DashboardPage() {
 
       {data && (
         <>
+          {data.lowStockMaterials.length > 0 && (
+            <div className="card row-alert" style={{ marginBottom: 24 }}>
+              <h2>Estoque baixo</h2>
+              <ul className="plain-list">
+                {data.lowStockMaterials.map((material) => (
+                  <li key={material.id}>
+                    <span className="badge-alert">{material.description}</span> — {material.stockQuantity}{" "}
+                    em estoque (alerta em {material.lowStockThreshold})
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="kpi-grid">
             <div className="kpi">
               <div className="label">OS no período</div>

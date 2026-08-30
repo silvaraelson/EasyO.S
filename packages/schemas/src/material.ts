@@ -7,11 +7,25 @@ export const materialSchema = z.object({
   unit: z.string().min(1), // ex.: "un", "m", "cx"
   cost: z.number().nonnegative(), // custo unitário, em centavos
   stockQuantity: z.number().int().default(0),
+  lowStockThreshold: z.number().int().nonnegative().optional(),
 });
 export type Material = z.infer<typeof materialSchema>;
 
 export const createMaterialInputSchema = materialSchema.omit({ id: true });
 export type CreateMaterialInput = z.infer<typeof createMaterialInputSchema>;
+
+export const restockMaterialInputSchema = z.object({
+  quantity: z.number().int().positive(),
+});
+export type RestockMaterialInput = z.infer<typeof restockMaterialInputSchema>;
+
+export const updateMaterialInputSchema = z.object({
+  description: z.string().min(1).optional(),
+  unit: z.string().min(1).optional(),
+  cost: z.number().nonnegative().optional(),
+  lowStockThreshold: z.number().int().nonnegative().nullable().optional(),
+});
+export type UpdateMaterialInput = z.infer<typeof updateMaterialInputSchema>;
 
 export const serviceOrderMaterialSchema = z.object({
   id: z.string().uuid(),

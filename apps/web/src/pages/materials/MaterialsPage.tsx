@@ -14,14 +14,31 @@ export function MaterialsPage() {
   const [description, setDescription] = useState("");
   const [unit, setUnit] = useState("un");
   const [cost, setCost] = useState("");
+  const [lowStockThreshold, setLowStockThreshold] = useState("");
+
+  const [restockQuantities, setRestockQuantities] = useState<Record<string, string>>({});
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["materials"] });
+  }
 
   const mutation = useMutation({
     mutationFn: api.materials.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["materials"] });
+      invalidate();
       setSku("");
       setDescription("");
       setCost("");
+      setLowStockThreshold("");
+    },
+  });
+
+  const restockMutation = useMutation({
+    mutationFn: ({ id, quantity }: { id: string; quantity: number }) =>
+      api.materials.restock(id, quantity),
+    onSuccess: (_data, variables) => {
+      invalidate();
+      setRestockQuantities((current) => ({ ...current, [variables.id]: "" }));
     },
   });
 
@@ -33,6 +50,7 @@ export function MaterialsPage() {
       unit,
       cost: Math.round(Number(cost.replace(",", ".")) * 100),
       stockQuantity: 0,
+      lowStockThreshold: lowStockThreshold ? Number(lowStockThreshold) : undefined,
     });
   }
 
@@ -53,20 +71,65 @@ export function MaterialsPage() {
               <th>Unidade</th>
               <th>Custo</th>
               <th>Estoque</th>
+              <th>Repor estoque</th>
             </tr>
           </thead>
           <tbody>
-            {materials.map((material) => (
-              <tr key={material.id}>
-                <td>{material.sku}</td>
-                <td>{material.description}</td>
-                <td>{material.unit}</td>
-                <td>{formatCurrency(material.cost)}</td>
-                <td>{material.stockQuantity}</td>
-              </tr>
-            ))}
+            {materials.map((material) => {
+              const isLowStock =
+                material.lowStockThreshold != null &&
+                material.stockQuantity <= material.lowStockThreshold;
+              return (
+                <tr key={material.id} className={isLowStock ? "row-alert" : undefined}>
+                  <td>{material.sku}</td>
+                  <td>{material.description}</td>
+                  <td>{material.unit}</td>
+                  <td>{formatCurrency(material.cost)}</td>
+                  <td>
+                    {material.stockQuantity}
+                    {isLowStock && <span className="badge-alert"> estoque baixo</span>}
+                  </td>
+                  <td>
+                    <form
+                      className="form-row"
+                      onSubmit={(event: FormEvent) => {
+                        event.preventDefault();
+                        const quantity = Number(restockQuantities[material.id]);
+                        if (quantity > 0) {
+                          restockMutation.mutate({ id: material.id, quantity });
+                        }
+                      }}
+                    >
+                      <input
+                        className="short"
+                        type="number"
+                        min={1}
+                        placeholder="Qtd."
+                        value={restockQuantities[material.id] ?? ""}
+                        onChange={(event) =>
+                          setRestockQuantities((current) => ({
+                            ...current,
+                            [material.id]: event.target.value,
+                          }))
+                        }
+                      />
+                      <button
+                        type="submit"
+                        className="button-secondary"
+                        disabled={restockMutation.isPending}
+                      >
+                        Adicionar
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+      )}
+      {restockMutation.isError && (
+        <p className="form-error">{(restockMutation.error as Error).message}</p>
       )}
 
       <form className="card form" onSubmit={handleSubmit}>
@@ -96,6 +159,16 @@ export function MaterialsPage() {
               value={cost}
               onChange={(event) => setCost(event.target.value)}
               required
+            />
+          </label>
+          <label className="short">
+            Alerta de estoque baixo (opcional)
+            <input
+              type="number"
+              min={0}
+              placeholder="ex.: 5"
+              value={lowStockThreshold}
+              onChange={(event) => setLowStockThreshold(event.target.value)}
             />
           </label>
         </div>

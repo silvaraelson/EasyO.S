@@ -1,6 +1,7 @@
 import type {
   Address,
   Budget,
+  CompanySettings,
   Contact,
   CreateBudgetInput,
   CreateCustomerInput,
@@ -11,12 +12,15 @@ import type {
   Invoice,
   Material,
   PaymentMethod,
+  Priority,
   ServiceOrder,
   ServiceOrderAttachment,
   ServiceOrderEvent,
   ServiceOrderMaterial,
   ServiceOrderStatus,
   ServiceType,
+  UpdateCompanySettingsInput,
+  UpdateMaterialInput,
   UserRole,
 } from "@easy-os/schemas";
 
@@ -63,6 +67,24 @@ export interface DashboardSummary {
   ticketMedio: number;
   totalRevenue: number;
   invoiceCount: number;
+  lowStockMaterials: {
+    id: string;
+    sku: string;
+    description: string;
+    stockQuantity: number;
+    lowStockThreshold: number | null;
+  }[];
+}
+
+export interface AgendaItem {
+  id: string;
+  number: number;
+  status: ServiceOrderStatus;
+  priority: Priority;
+  scheduledAt: string | null;
+  assignedTechnicianId: string | null;
+  technicianName: string | null;
+  customerName: string | null;
 }
 
 export const api = {
@@ -112,6 +134,18 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ scheduledAt, assignedTechnicianId }),
       }),
+    agenda: (from?: string, to?: string) => {
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      const query = params.toString();
+      return apiFetch<AgendaItem[]>(`/api/service-orders/agenda${query ? `?${query}` : ""}`);
+    },
+    updateTechnicalReport: (id: string, technicalReport: string) =>
+      apiFetch<ServiceOrder>(`/api/service-orders/${id}/technical-report`, {
+        method: "PATCH",
+        body: JSON.stringify({ technicalReport }),
+      }),
   },
   users: {
     list: (role?: UserRole) => apiFetch<BasicUser[]>(`/api/users${role ? `?role=${role}` : ""}`),
@@ -121,6 +155,24 @@ export const api = {
     create: (input: CreateMaterialInput) =>
       apiFetch<Material>("/api/materials", {
         method: "POST",
+        body: JSON.stringify(input),
+      }),
+    update: (id: string, input: UpdateMaterialInput) =>
+      apiFetch<Material>(`/api/materials/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    restock: (id: string, quantity: number) =>
+      apiFetch<Material>(`/api/materials/${id}/restock`, {
+        method: "POST",
+        body: JSON.stringify({ quantity }),
+      }),
+  },
+  companySettings: {
+    get: () => apiFetch<CompanySettings>("/api/company-settings"),
+    update: (input: UpdateCompanySettingsInput) =>
+      apiFetch<CompanySettings>("/api/company-settings", {
+        method: "PUT",
         body: JSON.stringify(input),
       }),
   },
@@ -148,6 +200,10 @@ export const api = {
         body: JSON.stringify({ paymentMethod }),
       }),
     invoicePdfUrl: (invoiceId: string) => `${API_URL}/api/invoices/${invoiceId}/pdf`,
+    technicalReportPdfUrl: (serviceOrderId: string) =>
+      `${API_URL}/api/service-orders/${serviceOrderId}/pdf/laudo-tecnico`,
+    materialsListPdfUrl: (serviceOrderId: string) =>
+      `${API_URL}/api/service-orders/${serviceOrderId}/pdf/lista-materiais`,
   },
   dashboard: {
     summary: (from?: string, to?: string) => {

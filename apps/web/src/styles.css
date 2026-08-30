@@ -330,6 +330,62 @@ td {
   max-width: 320px;
 }
 
+/* alertas */
+
+.row-alert {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.badge-alert {
+  color: var(--danger);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* agenda */
+
+.agenda-day {
+  margin-bottom: 1.5rem;
+}
+
+.agenda-day h3 {
+  font-size: 0.95rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.agenda-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.agenda-item .time {
+  font-weight: 600;
+  min-width: 3.5rem;
+}
+
+/* configurações */
+
+.settings-preview {
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+
+.settings-preview img {
+  max-height: 80px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px;
+  background: #fff;
+}
+
 /* financeiro */
 
 .finance-block {

@@ -11,6 +11,8 @@ import { syncRoutes } from "./routes/sync.js";
 import { materialRoutes } from "./routes/materials.js";
 import { financeRoutes } from "./routes/finance.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
+import { companySettingsRoutes } from "./routes/company-settings.js";
+import { startReminderScheduler } from "./lib/reminders.js";
 
 const app = Fastify({ logger: true });
 
@@ -29,10 +31,14 @@ await app.register(syncRoutes, { prefix: "/api" });
 await app.register(materialRoutes, { prefix: "/api" });
 await app.register(financeRoutes, { prefix: "/api" });
 await app.register(dashboardRoutes, { prefix: "/api" });
+await app.register(companySettingsRoutes, { prefix: "/api" });
 
 app
   .listen({ port: env.PORT, host: "0.0.0.0" })
-  .then(() => app.log.info(`easy-os api on :${env.PORT}`))
+  .then(() => {
+    app.log.info(`easy-os api on :${env.PORT}`);
+    startReminderScheduler();
+  })
   .catch((error) => {
     app.log.error(error);
     process.exit(1);

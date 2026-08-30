@@ -114,6 +114,14 @@ export function FinanceSection({ serviceOrderId, serviceOrder }: Props) {
           </ul>
         )}
         <p className="muted">Subtotal materiais: {formatCurrency(materialsTotal)}</p>
+        <a
+          className="button-secondary"
+          href={api.finance.materialsListPdfUrl(serviceOrderId)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Baixar lista de materiais (PDF)
+        </a>
 
         <form
           className="form-row"

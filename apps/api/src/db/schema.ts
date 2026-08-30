@@ -202,6 +202,8 @@ export const serviceOrders = pgTable("service_orders", {
   checkOutLongitude: numeric("check_out_longitude", { precision: 9, scale: 6, mode: "number" }),
   checklistResults: jsonb("checklist_results").notNull().default({}),
   description: text("description"),
+  technicalReport: text("technical_report"),
+  reminderSentAt: timestamp("reminder_sent_at"),
   createdBy: uuid("created_by")
     .notNull()
     .references(() => user.id),
@@ -246,6 +248,7 @@ export const materials = pgTable("materials", {
   unit: text("unit").notNull(),
   cost: integer("cost").notNull(), // em centavos
   stockQuantity: integer("stock_quantity").notNull().default(0),
+  lowStockThreshold: integer("low_stock_threshold"),
 });
 
 export const serviceOrderMaterials = pgTable("service_order_materials", {
@@ -292,4 +295,23 @@ export const invoices = pgTable("invoices", {
   paymentMethod: paymentMethodEnum("payment_method"),
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ---------------------------------------------------------------------------
+// Configurações da empresa — usadas para personalizar os PDFs gerados
+// (linha única; sempre lida/gravada pelo id fixo COMPANY_SETTINGS_ID).
+// ---------------------------------------------------------------------------
+
+export const companySettings = pgTable("company_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().default("Easy OS"),
+  document: text("document"), // CNPJ/CPF
+  phone: text("phone"),
+  email: text("email"),
+  logoDataUrl: text("logo_data_url"), // data:image/...;base64,... (imagem pequena)
+  signatureDataUrl: text("signature_data_url"),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 });

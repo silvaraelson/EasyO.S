@@ -50,6 +50,13 @@
       "when": 1788052440205,
       "tag": "0006_bored_dazzler",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788063389808,
+      "tag": "0007_neat_toxin",
+      "breakpoints": true
     }
   ]
 }

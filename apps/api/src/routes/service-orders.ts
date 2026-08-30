@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { z } from "zod";
 import {
   checkInInputSchema,
@@ -9,12 +9,14 @@ import {
   SERVICE_ORDER_TRANSITIONS,
   serviceOrderStatusSchema,
   updateChecklistInputSchema,
+  updateTechnicalReportInputSchema,
 } from "@easy-os/schemas";
 import { db } from "../db/client.js";
 import {
   addresses,
   budgetItems,
   budgets,
+  customers,
   invoices,
   serviceOrderAttachments,
   serviceOrderEvents,
@@ -70,6 +72,32 @@ export const serviceOrderRoutes: FastifyPluginAsync = async (app) => {
           inArray(serviceOrders.status, TECHNICIAN_OPEN_STATUSES),
         ),
       )
+      .orderBy(serviceOrders.scheduledAt);
+  });
+
+  /** Agenda: OS agendadas num intervalo (padrão: próximos 7 dias). */
+  app.get("/service-orders/agenda", async (request) => {
+    const query = z
+      .object({ from: z.coerce.date().optional(), to: z.coerce.date().optional() })
+      .parse(request.query);
+    const from = query.from ?? new Date();
+    const to = query.to ?? new Date(from.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    return db
+      .select({
+        id: serviceOrders.id,
+        number: serviceOrders.number,
+        status: serviceOrders.status,
+        priority: serviceOrders.priority,
+        scheduledAt: serviceOrders.scheduledAt,
+        assignedTechnicianId: serviceOrders.assignedTechnicianId,
+        technicianName: user.name,
+        customerName: customers.name,
+      })
+      .from(serviceOrders)
+      .leftJoin(user, eq(serviceOrders.assignedTechnicianId, user.id))
+      .leftJoin(customers, eq(serviceOrders.customerId, customers.id))
+      .where(and(gte(serviceOrders.scheduledAt, from), lte(serviceOrders.scheduledAt, to)))
       .orderBy(serviceOrders.scheduledAt);
   });
 
@@ -328,6 +356,22 @@ export const serviceOrderRoutes: FastifyPluginAsync = async (app) => {
     const [updated] = await db
       .update(serviceOrders)
       .set({ checklistResults: input.checklistResults })
+      .where(eq(serviceOrders.id, id))
+      .returning();
+
+    if (!updated) {
+      return reply.code(404).send({ message: "OS não encontrada" });
+    }
+    return updated;
+  });
+
+  app.patch("/service-orders/:id/technical-report", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const input = updateTechnicalReportInputSchema.parse(request.body);
+
+    const [updated] = await db
+      .update(serviceOrders)
+      .set({ technicalReport: input.technicalReport })
       .where(eq(serviceOrders.id, id))
       .returning();
 

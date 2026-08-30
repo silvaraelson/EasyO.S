@@ -50,6 +50,8 @@ export const serviceOrderSchema = z.object({
   checkOutLongitude: z.number().min(-180).max(180).optional(),
   checklistResults: checklistResultsSchema.default({}),
   description: z.string().optional(),
+  technicalReport: z.string().optional(),
+  reminderSentAt: z.coerce.date().optional(),
   createdBy: z.string().uuid(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
@@ -67,12 +69,21 @@ export const createServiceOrderInputSchema = serviceOrderSchema.omit({
   checkOutLatitude: true,
   checkOutLongitude: true,
   checklistResults: true,
+  technicalReport: true,
+  reminderSentAt: true,
   createdBy: true,
   createdAt: true,
   updatedAt: true,
 });
 export type CreateServiceOrderInput = z.infer<
   typeof createServiceOrderInputSchema
+>;
+
+export const updateTechnicalReportInputSchema = z.object({
+  technicalReport: z.string().min(1),
+});
+export type UpdateTechnicalReportInput = z.infer<
+  typeof updateTechnicalReportInputSchema
 >;
 
 export const updateServiceOrderStatusInputSchema = z.object({

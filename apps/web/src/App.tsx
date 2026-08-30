@@ -11,6 +11,8 @@ import { ServiceOrderDetailPage } from "./pages/service-orders/ServiceOrderDetai
 import { ServiceTypesPage } from "./pages/service-types/ServiceTypesPage";
 import { MaterialsPage } from "./pages/materials/MaterialsPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { AgendaPage } from "./pages/agenda/AgendaPage";
+import { SettingsPage } from "./pages/settings/SettingsPage";
 
 export function App() {
   return (
@@ -29,6 +31,8 @@ export function App() {
           <Route path="/ordens-de-servico/:id" element={<ServiceOrderDetailPage />} />
           <Route path="/tipos-de-servico" element={<ServiceTypesPage />} />
           <Route path="/materiais" element={<MaterialsPage />} />
+          <Route path="/agenda" element={<AgendaPage />} />
+          <Route path="/configuracoes" element={<SettingsPage />} />
         </Route>
       </Route>
     </Routes>
