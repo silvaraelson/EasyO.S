@@ -13,6 +13,7 @@ import { MaterialsPage } from "./pages/materials/MaterialsPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { AgendaPage } from "./pages/agenda/AgendaPage";
 import { SettingsPage } from "./pages/settings/SettingsPage";
+import { UsersPage } from "./pages/users/UsersPage";
 
 export function App() {
   return (
@@ -33,6 +34,7 @@ export function App() {
           <Route path="/materiais" element={<MaterialsPage />} />
           <Route path="/agenda" element={<AgendaPage />} />
           <Route path="/configuracoes" element={<SettingsPage />} />
+          <Route path="/usuarios" element={<UsersPage />} />
         </Route>
       </Route>
     </Routes>

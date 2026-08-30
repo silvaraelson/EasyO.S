@@ -8,6 +8,7 @@ import type {
   CreateMaterialInput,
   CreateServiceOrderInput,
   CreateServiceTypeInput,
+  CreateUserWithPasswordInput,
   Customer,
   Invoice,
   Material,
@@ -21,6 +22,7 @@ import type {
   ServiceType,
   UpdateCompanySettingsInput,
   UpdateMaterialInput,
+  UpdateUserInput,
   UserRole,
 } from "@easy-os/schemas";
 
@@ -53,7 +55,15 @@ export type ServiceOrderDetail = ServiceOrder & {
   budget: (Budget & { items: { id: string; description: string; quantity: number; unitPrice: number }[] }) | null;
   invoice: Invoice | null;
 };
-export type BasicUser = { id: string; name: string; email: string; role: UserRole };
+export type BasicUser = {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  team?: string | null;
+  active: boolean;
+  createdAt: string;
+};
 
 export interface DashboardSummary {
   range: { from: string; to: string };
@@ -149,6 +159,21 @@ export const api = {
   },
   users: {
     list: (role?: UserRole) => apiFetch<BasicUser[]>(`/api/users${role ? `?role=${role}` : ""}`),
+    create: (input: CreateUserWithPasswordInput) =>
+      apiFetch<BasicUser>("/api/users", {
+        method: "POST",
+        body: JSON.stringify(input),
+      }),
+    update: (id: string, input: UpdateUserInput) =>
+      apiFetch<BasicUser>(`/api/users/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(input),
+      }),
+    resetPassword: (id: string, password: string) =>
+      apiFetch<{ ok: boolean }>(`/api/users/${id}/reset-password`, {
+        method: "POST",
+        body: JSON.stringify({ password }),
+      }),
   },
   materials: {
     list: () => apiFetch<Material[]>("/api/materials"),

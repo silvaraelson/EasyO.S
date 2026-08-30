@@ -31,6 +31,7 @@ export function Layout() {
           {user?.role === "admin" && (
             <NavLink to="/configuracoes">Configurações</NavLink>
           )}
+          {user?.role === "admin" && <NavLink to="/usuarios">Usuários</NavLink>}
         </nav>
         {user && (
           <div className="user-menu">

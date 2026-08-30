@@ -7,12 +7,17 @@ export async function requireAuth(request: FastifyRequest, reply: FastifyReply) 
   if (!session) {
     return reply.code(401).send({ message: "Não autenticado" });
   }
-  request.currentUser = session.user as unknown as {
+  const sessionUser = session.user as unknown as {
     id: string;
     name: string;
     email: string;
     role: UserRole;
+    active: boolean;
   };
+  if (!sessionUser.active) {
+    return reply.code(403).send({ message: "Conta desativada" });
+  }
+  request.currentUser = sessionUser;
 }
 
 export function requireRole(...roles: UserRole[]) {

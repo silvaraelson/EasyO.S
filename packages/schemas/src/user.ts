@@ -17,3 +17,24 @@ export const createUserInputSchema = userSchema.omit({
   createdAt: true,
 });
 export type CreateUserInput = z.infer<typeof createUserInputSchema>;
+
+export const createUserWithPasswordInputSchema = createUserInputSchema.extend({
+  password: z.string().min(8),
+});
+export type CreateUserWithPasswordInput = z.infer<
+  typeof createUserWithPasswordInputSchema
+>;
+
+export const updateUserInputSchema = z.object({
+  role: userRoleSchema.optional(),
+  team: z.string().nullish(),
+  active: z.boolean().optional(),
+});
+export type UpdateUserInput = z.infer<typeof updateUserInputSchema>;
+
+export const resetUserPasswordInputSchema = z.object({
+  password: z.string().min(8),
+});
+export type ResetUserPasswordInput = z.infer<
+  typeof resetUserPasswordInputSchema
+>;
