@@ -34,8 +34,8 @@ export function SettingsPage() {
     setDocument(data.document ?? "");
     setPhone(data.phone ?? "");
     setEmail(data.email ?? "");
-    setLogoDataUrl(data.logoDataUrl);
-    setSignatureDataUrl(data.signatureDataUrl);
+    setLogoDataUrl(data.logoDataUrl ?? undefined);
+    setSignatureDataUrl(data.signatureDataUrl ?? undefined);
   }, [data]);
 
   const mutation = useMutation({
