@@ -43,6 +43,13 @@
       "when": 1788030516716,
       "tag": "0005_boring_reavers",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788052440205,
+      "tag": "0006_bored_dazzler",
+      "breakpoints": true
     }
   ]
 }

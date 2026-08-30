@@ -43,6 +43,12 @@
         }
       ],
       [
+        "expo-notifications",
+        {
+          "color": "#1d6e67"
+        }
+      ],
+      [
         "@lovesworking/watermelondb-expo-plugin-sdk-52-plus"
       ],
       [

@@ -51,4 +51,11 @@ export const api = {
   serviceTypes: {
     list: () => apiFetch<ServiceType[]>("/api/service-types"),
   },
+  users: {
+    savePushToken: (token: string) =>
+      apiFetch<{ ok: true }>("/api/users/me/push-token", {
+        method: "POST",
+        body: JSON.stringify({ token }),
+      }),
+  },
 };

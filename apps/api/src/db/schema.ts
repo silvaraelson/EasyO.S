@@ -73,6 +73,7 @@ export const user = pgTable("user", {
   role: userRoleEnum("role").notNull().default("attendant"),
   team: text("team"),
   active: boolean("active").notNull().default(true),
+  pushToken: text("push_token"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

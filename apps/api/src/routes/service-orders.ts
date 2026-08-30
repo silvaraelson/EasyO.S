@@ -20,8 +20,10 @@ import {
   serviceOrderEvents,
   serviceOrderMaterials,
   serviceOrders,
+  user,
 } from "../db/schema.js";
 import { requireAuth } from "../lib/guards.js";
+import { sendPushNotification } from "../lib/push.js";
 
 const updateStatusBodySchema = z.object({
   status: serviceOrderStatusSchema,
@@ -218,6 +220,23 @@ export const serviceOrderRoutes: FastifyPluginAsync = async (app) => {
       status: "scheduled",
       createdBy: currentUser.id,
     });
+
+    if (updated?.assignedTechnicianId) {
+      const [technician] = await db
+        .select({ pushToken: user.pushToken })
+        .from(user)
+        .where(eq(user.id, updated.assignedTechnicianId));
+      if (technician?.pushToken) {
+        const when = updated.scheduledAt
+          ? new Date(updated.scheduledAt).toLocaleString("pt-BR")
+          : "";
+        await sendPushNotification(technician.pushToken, {
+          title: `Nova OS agendada — #${updated.number}`,
+          body: when ? `Para ${when}` : "Confira os detalhes no app",
+          data: { serviceOrderId: id },
+        });
+      }
+    }
 
     return updated;
   });
