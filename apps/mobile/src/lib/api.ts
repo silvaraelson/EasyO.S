@@ -1,8 +1,10 @@
 import type {
   CreateAttachmentInput,
+  Material,
   ServiceOrder,
   ServiceOrderAttachment,
   ServiceOrderEvent,
+  ServiceOrderMaterial,
   ServiceType,
 } from "@easy-os/schemas";
 import { authClient } from "./auth-client";
@@ -32,6 +34,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 export type ServiceOrderDetail = ServiceOrder & {
   events: ServiceOrderEvent[];
   attachments: ServiceOrderAttachment[];
+  materialsUsed: ServiceOrderMaterial[];
 };
 
 /**
@@ -47,9 +50,24 @@ export const api = {
         method: "POST",
         body: JSON.stringify(input),
       }),
+    updateTechnicalReport: (id: string, technicalReport: string) =>
+      apiFetch<ServiceOrder>(`/api/service-orders/${id}/technical-report`, {
+        method: "PATCH",
+        body: JSON.stringify({ technicalReport }),
+      }),
   },
   serviceTypes: {
     list: () => apiFetch<ServiceType[]>("/api/service-types"),
+  },
+  materials: {
+    list: () => apiFetch<Material[]>("/api/materials"),
+  },
+  finance: {
+    addMaterialUsage: (serviceOrderId: string, materialId: string, quantity: number) =>
+      apiFetch<ServiceOrderMaterial>(`/api/service-orders/${serviceOrderId}/materials`, {
+        method: "POST",
+        body: JSON.stringify({ materialId, quantity }),
+      }),
   },
   users: {
     savePushToken: (token: string) =>

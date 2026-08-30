@@ -55,7 +55,7 @@ export const financeRoutes: FastifyPluginAsync = async (app) => {
 
   app.post(
     "/service-orders/:id/materials",
-    { preHandler: requireRole("admin", "manager", "attendant") },
+    { preHandler: requireRole("admin", "manager", "attendant", "technician") },
     async (request, reply) => {
       const { id } = request.params as { id: string };
       const input = addServiceOrderMaterialInputSchema.parse(request.body);

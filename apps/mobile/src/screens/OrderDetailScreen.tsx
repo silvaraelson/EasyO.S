@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ActivityIndicator,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -52,10 +53,73 @@ export function OrderDetailScreen({ route }: Props) {
   });
 
   const { data: photos = [] } = useQuery({
-    queryKey: ["service-orders", orderId, "attachments"],
+    queryKey: ["service-orders", orderId, "detail"],
     queryFn: () => api.serviceOrders.get(orderId),
     select: (detail) => detail.attachments.filter((attachment) => attachment.kind === "photo"),
   });
+
+  const { data: materialsUsed = [] } = useQuery({
+    queryKey: ["service-orders", orderId, "detail"],
+    queryFn: () => api.serviceOrders.get(orderId),
+    select: (detail) => detail.materialsUsed,
+  });
+
+  const { data: remoteTechnicalReport } = useQuery({
+    queryKey: ["service-orders", orderId, "detail"],
+    queryFn: () => api.serviceOrders.get(orderId),
+    select: (detail) => detail.technicalReport,
+  });
+
+  const { data: materials = [] } = useQuery({
+    queryKey: ["materials"],
+    queryFn: api.materials.list,
+  });
+
+  const [materialId, setMaterialId] = useState<string | null>(null);
+  const [materialQuantity, setMaterialQuantity] = useState("1");
+  const [addingMaterial, setAddingMaterial] = useState(false);
+
+  const [technicalReport, setTechnicalReport] = useState("");
+  const [savingReport, setSavingReport] = useState(false);
+
+  useEffect(() => {
+    setTechnicalReport(remoteTechnicalReport ?? "");
+  }, [remoteTechnicalReport]);
+
+  function invalidateDetail() {
+    queryClient.invalidateQueries({ queryKey: ["service-orders", orderId, "detail"] });
+  }
+
+  async function handleAddMaterial() {
+    if (!materialId) return;
+    const quantity = Number(materialQuantity);
+    if (!quantity || quantity <= 0) return;
+
+    setAddingMaterial(true);
+    try {
+      await api.finance.addMaterialUsage(orderId, materialId, quantity);
+      invalidateDetail();
+      setMaterialId(null);
+      setMaterialQuantity("1");
+    } catch (error) {
+      Alert.alert("Erro ao lançar material", (error as Error).message);
+    } finally {
+      setAddingMaterial(false);
+    }
+  }
+
+  async function handleSaveReport() {
+    if (!technicalReport.trim()) return;
+    setSavingReport(true);
+    try {
+      await api.serviceOrders.updateTechnicalReport(orderId, technicalReport);
+      invalidateDetail();
+    } catch (error) {
+      Alert.alert("Erro ao salvar relato", (error as Error).message);
+    } finally {
+      setSavingReport(false);
+    }
+  }
 
   async function handleCheckIn() {
     if (!order) return;
@@ -196,6 +260,77 @@ export function OrderDetailScreen({ route }: Props) {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Materiais usados</Text>
+        {materialsUsed.length > 0 && (
+          <View style={{ marginBottom: 8 }}>
+            {materialsUsed.map((item) => {
+              const material = materials.find((m) => m.id === item.materialId);
+              return (
+                <Text key={item.id} style={styles.checklistLabel}>
+                  {item.quantity}× {material?.description ?? "Material"}
+                </Text>
+              );
+            })}
+          </View>
+        )}
+        <View style={styles.chipRow}>
+          {materials.map((material) => (
+            <TouchableOpacity
+              key={material.id}
+              style={[styles.chip, materialId === material.id && styles.chipSelected]}
+              onPress={() => setMaterialId(material.id)}
+            >
+              <Text
+                style={[styles.chipText, materialId === material.id && styles.chipTextSelected]}
+              >
+                {material.description}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {materialId && (
+          <View style={styles.materialAddRow}>
+            <TextInput
+              style={styles.quantityInput}
+              keyboardType="numeric"
+              value={materialQuantity}
+              onChangeText={setMaterialQuantity}
+            />
+            <TouchableOpacity
+              style={styles.buttonSecondary}
+              onPress={handleAddMaterial}
+              disabled={addingMaterial}
+            >
+              <Text style={styles.buttonSecondaryText}>
+                {addingMaterial ? "Lançando…" : "Adicionar"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Relato</Text>
+        <TextInput
+          style={styles.reportInput}
+          multiline
+          numberOfLines={4}
+          placeholder="O que foi encontrado e o que foi feito…"
+          value={technicalReport}
+          onChangeText={setTechnicalReport}
+        />
+        <TouchableOpacity
+          style={styles.buttonSecondary}
+          onPress={handleSaveReport}
+          disabled={savingReport}
+        >
+          <Text style={styles.buttonSecondaryText}>
+            {savingReport ? "Salvando…" : "Salvar relato"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {canCheckOut && (
         <TouchableOpacity style={styles.button} onPress={handleCheckOut} disabled={busy === "check-out"}>
           <Text style={styles.buttonText}>
@@ -288,5 +423,51 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 8,
+  },
+  chipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chip: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 999,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  chipSelected: {
+    borderColor: "#1d6e67",
+    backgroundColor: "#1d6e67",
+  },
+  chipText: {
+    fontSize: 13,
+    color: "#333",
+  },
+  chipTextSelected: {
+    color: "#fff",
+  },
+  materialAddRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+  },
+  quantityInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 8,
+    width: 64,
+    textAlign: "center",
+  },
+  reportInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    minHeight: 90,
+    textAlignVertical: "top",
+    fontSize: 15,
   },
 });
