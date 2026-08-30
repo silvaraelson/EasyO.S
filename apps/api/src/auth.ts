@@ -24,6 +24,14 @@ export const auth = betterAuth({
       // Postgres gerar o UUID em vez do Better Auth gerar um id não-UUID.
       generateId: false,
     },
+    // web e api são publicados em domínios diferentes (easy-os-web.onrender.com
+    // / easy-os-api.onrender.com — cross-site, não apenas cross-origin), então
+    // o cookie de sessão precisa de SameSite=None + Secure em produção pra ser
+    // enviado nas chamadas do web pra API. Em dev local (http, mesmo host,
+    // portas diferentes) isso quebraria o cookie, então só liga com HTTPS.
+    ...(env.BETTER_AUTH_URL.startsWith("https://")
+      ? { defaultCookieAttributes: { sameSite: "none" as const, secure: true } }
+      : {}),
   },
   user: {
     additionalFields: {
