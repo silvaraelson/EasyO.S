@@ -1,5 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { renderToBuffer } from "@react-pdf/renderer";
 import {
   addServiceOrderMaterialInputSchema,
@@ -17,6 +17,7 @@ import {
   customers,
   invoices,
   materials,
+  serviceOrderAttachments,
   serviceOrderEvents,
   serviceOrderMaterials,
   serviceOrders,
@@ -291,7 +292,7 @@ export const financeRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(404).send({ message: "OS não encontrada" });
     }
 
-    const [[customer], [address], [serviceType], [technician], company] = await Promise.all([
+    const [[customer], [address], [serviceType], [technician], company, photos] = await Promise.all([
       db.select().from(customers).where(eq(customers.id, serviceOrder.customerId)),
       db.select().from(addresses).where(eq(addresses.id, serviceOrder.addressId)),
       db.select().from(serviceTypes).where(eq(serviceTypes.id, serviceOrder.serviceTypeId)),
@@ -299,6 +300,15 @@ export const financeRoutes: FastifyPluginAsync = async (app) => {
         ? db.select().from(user).where(eq(user.id, serviceOrder.assignedTechnicianId))
         : Promise.resolve([]),
       getOrCreateCompanySettings(),
+      db
+        .select({ url: serviceOrderAttachments.url })
+        .from(serviceOrderAttachments)
+        .where(
+          and(
+            eq(serviceOrderAttachments.serviceOrderId, id),
+            eq(serviceOrderAttachments.kind, "photo"),
+          ),
+        ),
     ]);
 
     const buffer = await renderToBuffer(
@@ -316,6 +326,7 @@ export const financeRoutes: FastifyPluginAsync = async (app) => {
         checkOutAt: serviceOrder.checkOutAt,
         description: serviceOrder.description ?? undefined,
         technicalReport: serviceOrder.technicalReport ?? undefined,
+        photoUrls: photos.map((photo) => photo.url),
       }),
     );
 

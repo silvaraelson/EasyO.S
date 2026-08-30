@@ -386,6 +386,33 @@ td {
   background: #fff;
 }
 
+/* fotos */
+
+.photos-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.photos-section h3 {
+  font-size: 1rem;
+  margin-bottom: 8px;
+}
+
+.photo-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.photo-thumb {
+  width: 90px;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
 /* financeiro */
 
 .finance-block {

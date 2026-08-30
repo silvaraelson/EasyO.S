@@ -1,4 +1,4 @@
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import {
   CompanyHeader,
   formatDate,
@@ -19,12 +19,15 @@ export interface TechnicalReportPdfProps {
   checkOutAt?: Date | null;
   description?: string;
   technicalReport?: string;
+  photoUrls: string[];
 }
 
 const styles = StyleSheet.create({
   section: { marginBottom: 16 },
   label: { color: "#555555", marginBottom: 2 },
   body: { lineHeight: 1.5 },
+  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  photo: { width: 150, height: 150, objectFit: "cover", borderRadius: 4 },
 });
 
 export function TechnicalReportPdfDocument(props: TechnicalReportPdfProps) {
@@ -66,6 +69,17 @@ export function TechnicalReportPdfDocument(props: TechnicalReportPdfProps) {
             {props.technicalReport ?? "Nenhuma observação registrada."}
           </Text>
         </View>
+
+        {props.photoUrls.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.label}>Fotos</Text>
+            <View style={styles.photoGrid}>
+              {props.photoUrls.map((url, index) => (
+                <Image key={index} src={url} style={styles.photo} />
+              ))}
+            </View>
+          </View>
+        )}
 
         <SignatureBlock company={props.company} />
       </Page>

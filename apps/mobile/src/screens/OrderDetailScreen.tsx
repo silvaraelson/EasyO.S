@@ -221,6 +221,7 @@ export function OrderDetailScreen({ route }: Props) {
 
   // --- fotos: várias em sequência, upload em segundo plano ----------------
   const [localPhotos, setLocalPhotos] = useState<{ id: string; uri: string }[]>([]);
+  const [viewerUri, setViewerUri] = useState<string | null>(null);
 
   async function handleTakePhoto() {
     if (!order) return;
@@ -302,15 +303,17 @@ export function OrderDetailScreen({ route }: Props) {
           {(photos.length > 0 || localPhotos.length > 0) && (
             <View style={styles.photoRow}>
               {photos.map((attachment) => (
-                <Image key={attachment.id} source={{ uri: attachment.url }} style={styles.photo} />
+                <TouchableOpacity key={attachment.id} onPress={() => setViewerUri(attachment.url)}>
+                  <Image source={{ uri: attachment.url }} style={styles.photo} />
+                </TouchableOpacity>
               ))}
               {localPhotos.map((photo) => (
-                <View key={photo.id}>
+                <TouchableOpacity key={photo.id} onPress={() => setViewerUri(photo.uri)}>
                   <Image source={{ uri: photo.uri }} style={styles.photo} />
                   <View style={styles.photoUploadingBadge}>
                     <ActivityIndicator size="small" color="#fff" />
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           )}
@@ -413,6 +416,23 @@ export function OrderDetailScreen({ route }: Props) {
             )}
           </View>
         </View>
+      </Modal>
+
+      <Modal
+        visible={Boolean(viewerUri)}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setViewerUri(null)}
+      >
+        <TouchableOpacity
+          style={styles.viewerOverlay}
+          activeOpacity={1}
+          onPress={() => setViewerUri(null)}
+        >
+          {viewerUri && (
+            <Image source={{ uri: viewerUri }} style={styles.viewerImage} resizeMode="contain" />
+          )}
+        </TouchableOpacity>
       </Modal>
     </KeyboardAvoidingView>
   );
@@ -573,5 +593,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: "center",
     marginTop: 12,
+  },
+  viewerOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  viewerImage: {
+    width: "100%",
+    height: "100%",
   },
 });

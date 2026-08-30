@@ -63,6 +63,8 @@ export function ServiceOrderDetailPage() {
   if (error) return <p className="form-error">{(error as Error).message}</p>;
   if (!serviceOrder) return null;
 
+  const photos = serviceOrder.attachments.filter((attachment) => attachment.kind === "photo");
+
   return (
     <section>
       <div className="page-header">
@@ -188,6 +190,19 @@ export function ServiceOrderDetailPage() {
               </a>
             </div>
           </form>
+
+          {photos.length > 0 && (
+            <div className="photos-section">
+              <h3>Fotos</h3>
+              <div className="photo-grid">
+                {photos.map((photo) => (
+                  <a key={photo.id} href={photo.url} target="_blank" rel="noreferrer">
+                    <img src={photo.url} alt="Foto da OS" className="photo-thumb" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="card">
