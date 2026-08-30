@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -15,7 +18,7 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import * as Location from "expo-location";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { GeoPoint } from "@easy-os/schemas";
+import type { GeoPoint, Material } from "@easy-os/schemas";
 import type { RootStackParamList } from "../navigation";
 import { api } from "../lib/api";
 import { PRIORITY_LABELS, STATUS_LABELS } from "../lib/labels";
@@ -24,6 +27,9 @@ import { useServiceOrder } from "../db/hooks";
 import { runSync } from "../db/sync";
 
 type Props = NativeStackScreenProps<RootStackParamList, "OrderDetail">;
+
+const REPORT_AUTOSAVE_DELAY_MS = 900;
+const PHOTO_QUALITY = 0.35;
 
 async function getLocation(): Promise<GeoPoint | undefined> {
   const { status } = await Location.requestForegroundPermissionsAsync();
@@ -43,7 +49,7 @@ export function OrderDetailScreen({ route }: Props) {
   const { orderId } = route.params;
   const order = useServiceOrder(orderId);
   const queryClient = useQueryClient();
-  const [busy, setBusy] = useState<"check-in" | "check-out" | "photo" | null>(null);
+  const [checkingOut, setCheckingOut] = useState(false);
 
   const { data: serviceType } = useQuery({
     queryKey: ["service-types"],
@@ -75,32 +81,76 @@ export function OrderDetailScreen({ route }: Props) {
     queryFn: api.materials.list,
   });
 
-  const [materialId, setMaterialId] = useState<string | null>(null);
-  const [materialQuantity, setMaterialQuantity] = useState("1");
-  const [addingMaterial, setAddingMaterial] = useState(false);
-
-  const [technicalReport, setTechnicalReport] = useState("");
-  const [savingReport, setSavingReport] = useState(false);
-
-  useEffect(() => {
-    setTechnicalReport(remoteTechnicalReport ?? "");
-  }, [remoteTechnicalReport]);
-
   function invalidateDetail() {
     queryClient.invalidateQueries({ queryKey: ["service-orders", orderId, "detail"] });
   }
 
+  // --- relato: salva automaticamente, sem botão -------------------------
+  const [technicalReport, setTechnicalReport] = useState("");
+  const [reportStatus, setReportStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const lastSavedReportRef = useRef<string | undefined>(undefined);
+  const reportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (lastSavedReportRef.current === undefined && remoteTechnicalReport !== undefined) {
+      setTechnicalReport(remoteTechnicalReport ?? "");
+      lastSavedReportRef.current = remoteTechnicalReport ?? "";
+    }
+  }, [remoteTechnicalReport]);
+
+  useEffect(() => {
+    return () => {
+      if (reportTimerRef.current) clearTimeout(reportTimerRef.current);
+    };
+  }, []);
+
+  async function saveReport(text: string) {
+    if (text === lastSavedReportRef.current) return;
+    setReportStatus("saving");
+    try {
+      await api.serviceOrders.updateTechnicalReport(orderId, text);
+      lastSavedReportRef.current = text;
+      setReportStatus("saved");
+    } catch {
+      // falha silenciosa — tenta de novo na próxima alteração ou reabertura da tela
+      setReportStatus("idle");
+    }
+  }
+
+  function handleReportChange(text: string) {
+    setTechnicalReport(text);
+    setReportStatus("idle");
+    if (reportTimerRef.current) clearTimeout(reportTimerRef.current);
+    reportTimerRef.current = setTimeout(() => saveReport(text), REPORT_AUTOSAVE_DELAY_MS);
+  }
+
+  // --- materiais usados: modal de seleção + quantidade -------------------
+  const [materialModalVisible, setMaterialModalVisible] = useState(false);
+  const [pendingMaterial, setPendingMaterial] = useState<Material | null>(null);
+  const [materialQuantity, setMaterialQuantity] = useState("1");
+  const [addingMaterial, setAddingMaterial] = useState(false);
+
+  function openMaterialModal() {
+    setPendingMaterial(null);
+    setMaterialQuantity("1");
+    setMaterialModalVisible(true);
+  }
+
+  function closeMaterialModal() {
+    setMaterialModalVisible(false);
+    setPendingMaterial(null);
+  }
+
   async function handleAddMaterial() {
-    if (!materialId) return;
+    if (!pendingMaterial) return;
     const quantity = Number(materialQuantity);
     if (!quantity || quantity <= 0) return;
 
     setAddingMaterial(true);
     try {
-      await api.finance.addMaterialUsage(orderId, materialId, quantity);
+      await api.finance.addMaterialUsage(orderId, pendingMaterial.id, quantity);
       invalidateDetail();
-      setMaterialId(null);
-      setMaterialQuantity("1");
+      closeMaterialModal();
     } catch (error) {
       Alert.alert("Erro ao lançar material", (error as Error).message);
     } finally {
@@ -108,22 +158,9 @@ export function OrderDetailScreen({ route }: Props) {
     }
   }
 
-  async function handleSaveReport() {
-    if (!technicalReport.trim()) return;
-    setSavingReport(true);
-    try {
-      await api.serviceOrders.updateTechnicalReport(orderId, technicalReport);
-      invalidateDetail();
-    } catch (error) {
-      Alert.alert("Erro ao salvar relato", (error as Error).message);
-    } finally {
-      setSavingReport(false);
-    }
-  }
-
+  // --- check-in: automático ao abrir a OS --------------------------------
   async function handleCheckIn() {
     if (!order) return;
-    setBusy("check-in");
     try {
       const location = await getLocation();
       await database.write(async () => {
@@ -139,14 +176,19 @@ export function OrderDetailScreen({ route }: Props) {
       syncInBackground();
     } catch (error) {
       Alert.alert("Erro no check-in", (error as Error).message);
-    } finally {
-      setBusy(null);
     }
   }
 
+  useEffect(() => {
+    if (order?.status === "scheduled") {
+      handleCheckIn();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order?.status]);
+
   async function handleCheckOut() {
     if (!order) return;
-    setBusy("check-out");
+    setCheckingOut(true);
     try {
       const location = await getLocation();
       await database.write(async () => {
@@ -161,9 +203,9 @@ export function OrderDetailScreen({ route }: Props) {
       });
       syncInBackground();
     } catch (error) {
-      Alert.alert("Erro no check-out", (error as Error).message);
+      Alert.alert("Erro ao finalizar a OS", (error as Error).message);
     } finally {
-      setBusy(null);
+      setCheckingOut(false);
     }
   }
 
@@ -177,27 +219,38 @@ export function OrderDetailScreen({ route }: Props) {
     syncInBackground();
   }
 
+  // --- fotos: várias em sequência, upload em segundo plano ----------------
+  const [localPhotos, setLocalPhotos] = useState<{ id: string; uri: string }[]>([]);
+
   async function handleTakePhoto() {
     if (!order) return;
-    setBusy("photo");
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) throw new Error("Permissão de câmera negada");
 
-      const result = await ImagePicker.launchCameraAsync({ base64: true, quality: 0.5 });
+      const result = await ImagePicker.launchCameraAsync({ base64: true, quality: PHOTO_QUALITY });
       const asset = result.assets?.[0];
-      if (result.canceled || !asset?.base64) return;
+      if (result.canceled || !asset?.base64 || !asset.uri) return;
+
+      const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      setLocalPhotos((current) => [...current, { id: localId, uri: asset.uri }]);
 
       const dataUrl = `data:image/jpeg;base64,${asset.base64}`;
-      await api.serviceOrders.addAttachment(order.id, { kind: "photo", dataUrl });
-      queryClient.invalidateQueries({ queryKey: ["service-orders", orderId, "attachments"] });
+      api.serviceOrders
+        .addAttachment(order.id, { kind: "photo", dataUrl })
+        .then(() => {
+          setLocalPhotos((current) => current.filter((photo) => photo.id !== localId));
+          invalidateDetail();
+        })
+        .catch((error) => {
+          setLocalPhotos((current) => current.filter((photo) => photo.id !== localId));
+          Alert.alert(
+            "Erro ao enviar foto",
+            `${(error as Error).message} — a foto não foi salva, tente de novo quando tiver sinal.`,
+          );
+        });
     } catch (error) {
-      Alert.alert(
-        "Erro ao anexar foto",
-        `${(error as Error).message} — fotos exigem conexão, tente de novo quando tiver sinal.`,
-      );
-    } finally {
-      setBusy(null);
+      Alert.alert("Erro ao tirar foto", (error as Error).message);
     }
   }
 
@@ -209,136 +262,159 @@ export function OrderDetailScreen({ route }: Props) {
     );
   }
 
-  const canCheckIn = order.status === "scheduled";
   const canCheckOut = order.status === "in_progress" || order.status === "paused";
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>OS #{order.number}</Text>
-      <Text style={styles.meta}>
-        {STATUS_LABELS[order.status as keyof typeof STATUS_LABELS] ?? order.status} ·{" "}
-        {PRIORITY_LABELS[order.priority as keyof typeof PRIORITY_LABELS] ?? order.priority}
-      </Text>
-      {order.description && <Text style={styles.description}>{order.description}</Text>}
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+    >
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.title}>OS #{order.number}</Text>
+        <Text style={styles.meta}>
+          {STATUS_LABELS[order.status as keyof typeof STATUS_LABELS] ?? order.status} ·{" "}
+          {PRIORITY_LABELS[order.priority as keyof typeof PRIORITY_LABELS] ?? order.priority}
+        </Text>
+        {order.description && <Text style={styles.description}>{order.description}</Text>}
 
-      {canCheckIn && (
-        <TouchableOpacity style={styles.button} onPress={handleCheckIn} disabled={busy === "check-in"}>
-          <Text style={styles.buttonText}>
-            {busy === "check-in" ? "Fazendo check-in…" : "Check-in"}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {serviceType && serviceType.checklist.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Checklist</Text>
-          {serviceType.checklist.map((item) => (
-            <View key={item.id} style={styles.checklistRow}>
-              <Text style={styles.checklistLabel}>{item.label}</Text>
-              <Switch
-                value={Boolean(order.checklistResults[item.id])}
-                onValueChange={(value) => toggleChecklistItem(item.id, value)}
-              />
-            </View>
-          ))}
-        </View>
-      )}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Fotos</Text>
-        {photos.length > 0 && (
-          <View style={styles.photoRow}>
-            {photos.map((attachment) => (
-              <Image key={attachment.id} source={{ uri: attachment.url }} style={styles.photo} />
+        {serviceType && serviceType.checklist.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Checklist</Text>
+            {serviceType.checklist.map((item) => (
+              <View key={item.id} style={styles.checklistRow}>
+                <Text style={styles.checklistLabel}>{item.label}</Text>
+                <Switch
+                  value={Boolean(order.checklistResults[item.id])}
+                  onValueChange={(value) => toggleChecklistItem(item.id, value)}
+                />
+              </View>
             ))}
           </View>
         )}
-        <TouchableOpacity style={styles.buttonSecondary} onPress={handleTakePhoto} disabled={busy === "photo"}>
-          <Text style={styles.buttonSecondaryText}>
-            {busy === "photo" ? "Enviando…" : "Tirar foto"}
-          </Text>
-        </TouchableOpacity>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Materiais usados</Text>
-        {materialsUsed.length > 0 && (
-          <View style={{ marginBottom: 8 }}>
-            {materialsUsed.map((item) => {
-              const material = materials.find((m) => m.id === item.materialId);
-              return (
-                <Text key={item.id} style={styles.checklistLabel}>
-                  {item.quantity}× {material?.description ?? "Material"}
-                </Text>
-              );
-            })}
-          </View>
-        )}
-        <View style={styles.chipRow}>
-          {materials.map((material) => (
-            <TouchableOpacity
-              key={material.id}
-              style={[styles.chip, materialId === material.id && styles.chipSelected]}
-              onPress={() => setMaterialId(material.id)}
-            >
-              <Text
-                style={[styles.chipText, materialId === material.id && styles.chipTextSelected]}
-              >
-                {material.description}
-              </Text>
-            </TouchableOpacity>
-          ))}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Fotos</Text>
+          {(photos.length > 0 || localPhotos.length > 0) && (
+            <View style={styles.photoRow}>
+              {photos.map((attachment) => (
+                <Image key={attachment.id} source={{ uri: attachment.url }} style={styles.photo} />
+              ))}
+              {localPhotos.map((photo) => (
+                <View key={photo.id}>
+                  <Image source={{ uri: photo.uri }} style={styles.photo} />
+                  <View style={styles.photoUploadingBadge}>
+                    <ActivityIndicator size="small" color="#fff" />
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+          <TouchableOpacity style={styles.buttonSecondary} onPress={handleTakePhoto}>
+            <Text style={styles.buttonSecondaryText}>Tirar foto</Text>
+          </TouchableOpacity>
         </View>
-        {materialId && (
-          <View style={styles.materialAddRow}>
-            <TextInput
-              style={styles.quantityInput}
-              keyboardType="numeric"
-              value={materialQuantity}
-              onChangeText={setMaterialQuantity}
-            />
-            <TouchableOpacity
-              style={styles.buttonSecondary}
-              onPress={handleAddMaterial}
-              disabled={addingMaterial}
-            >
-              <Text style={styles.buttonSecondaryText}>
-                {addingMaterial ? "Lançando…" : "Adicionar"}
-              </Text>
-            </TouchableOpacity>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Materiais usados</Text>
+          {materialsUsed.length > 0 && (
+            <View style={{ marginBottom: 8 }}>
+              {materialsUsed.map((item) => {
+                const material = materials.find((m) => m.id === item.materialId);
+                return (
+                  <Text key={item.id} style={styles.checklistLabel}>
+                    {item.quantity}× {material?.description ?? "Material"}
+                  </Text>
+                );
+              })}
+            </View>
+          )}
+          <TouchableOpacity style={styles.buttonSecondary} onPress={openMaterialModal}>
+            <Text style={styles.buttonSecondaryText}>Selecionar material</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.reportHeader}>
+            <Text style={styles.sectionTitle}>Relato</Text>
+            {reportStatus === "saving" && <Text style={styles.reportStatus}>Salvando…</Text>}
+            {reportStatus === "saved" && <Text style={styles.reportStatus}>Salvo</Text>}
           </View>
+          <TextInput
+            style={styles.reportInput}
+            multiline
+            numberOfLines={4}
+            placeholder="O que foi encontrado e o que foi feito…"
+            value={technicalReport}
+            onChangeText={handleReportChange}
+          />
+        </View>
+
+        {canCheckOut && (
+          <TouchableOpacity style={styles.button} onPress={handleCheckOut} disabled={checkingOut}>
+            <Text style={styles.buttonText}>{checkingOut ? "Finalizando…" : "Finalizar O.S."}</Text>
+          </TouchableOpacity>
         )}
-      </View>
+      </ScrollView>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Relato</Text>
-        <TextInput
-          style={styles.reportInput}
-          multiline
-          numberOfLines={4}
-          placeholder="O que foi encontrado e o que foi feito…"
-          value={technicalReport}
-          onChangeText={setTechnicalReport}
-        />
-        <TouchableOpacity
-          style={styles.buttonSecondary}
-          onPress={handleSaveReport}
-          disabled={savingReport}
-        >
-          <Text style={styles.buttonSecondaryText}>
-            {savingReport ? "Salvando…" : "Salvar relato"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {canCheckOut && (
-        <TouchableOpacity style={styles.button} onPress={handleCheckOut} disabled={busy === "check-out"}>
-          <Text style={styles.buttonText}>
-            {busy === "check-out" ? "Fazendo check-out…" : "Concluir (check-out)"}
-          </Text>
-        </TouchableOpacity>
-      )}
-    </ScrollView>
+      <Modal
+        visible={materialModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={closeMaterialModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            {!pendingMaterial ? (
+              <>
+                <Text style={styles.sectionTitle}>Selecionar material</Text>
+                <ScrollView style={styles.modalList}>
+                  {materials.map((material) => (
+                    <TouchableOpacity
+                      key={material.id}
+                      style={styles.modalRow}
+                      onPress={() => setPendingMaterial(material)}
+                    >
+                      <Text style={styles.modalRowText}>{material.description}</Text>
+                      <Text style={styles.modalRowMeta}>{material.stockQuantity} em estoque</Text>
+                    </TouchableOpacity>
+                  ))}
+                  {materials.length === 0 && <Text style={styles.meta}>Nenhum material cadastrado.</Text>}
+                </ScrollView>
+                <TouchableOpacity style={styles.buttonSecondary} onPress={closeMaterialModal}>
+                  <Text style={styles.buttonSecondaryText}>Cancelar</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.sectionTitle}>{pendingMaterial.description}</Text>
+                <Text style={styles.meta}>{pendingMaterial.stockQuantity} em estoque</Text>
+                <TextInput
+                  style={styles.quantityInputLarge}
+                  keyboardType="numeric"
+                  value={materialQuantity}
+                  onChangeText={setMaterialQuantity}
+                  autoFocus
+                />
+                <TouchableOpacity style={styles.button} onPress={handleAddMaterial} disabled={addingMaterial}>
+                  <Text style={styles.buttonText}>{addingMaterial ? "Lançando…" : "Adicionar"}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.buttonSecondary}
+                  onPress={() => setPendingMaterial(null)}
+                >
+                  <Text style={styles.buttonSecondaryText}>Voltar</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -346,6 +422,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  scroll: {
+    flex: 1,
   },
   center: {
     flex: 1,
@@ -400,6 +479,16 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: 8,
   },
+  reportHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  reportStatus: {
+    fontSize: 12,
+    color: "#999",
+    marginBottom: 8,
+  },
   checklistRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -424,42 +513,16 @@ const styles = StyleSheet.create({
     height: 88,
     borderRadius: 8,
   },
-  chipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  chip: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  chipSelected: {
-    borderColor: "#1d6e67",
-    backgroundColor: "#1d6e67",
-  },
-  chipText: {
-    fontSize: 13,
-    color: "#333",
-  },
-  chipTextSelected: {
-    color: "#fff",
-  },
-  materialAddRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 12,
-  },
-  quantityInput: {
-    borderWidth: 1,
-    borderColor: "#ccc",
+  photoUploadingBadge: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     borderRadius: 8,
-    padding: 8,
-    width: 64,
-    textAlign: "center",
+    backgroundColor: "rgba(0,0,0,0.35)",
+    alignItems: "center",
+    justifyContent: "center",
   },
   reportInput: {
     borderWidth: 1,
@@ -469,5 +532,46 @@ const styles = StyleSheet.create({
     minHeight: 90,
     textAlignVertical: "top",
     fontSize: 15,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  modalCard: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    maxHeight: "80%",
+  },
+  modalList: {
+    marginTop: 8,
+  },
+  modalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+  },
+  modalRowText: {
+    fontSize: 15,
+    flex: 1,
+    marginRight: 12,
+  },
+  modalRowMeta: {
+    fontSize: 13,
+    color: "#666",
+  },
+  quantityInputLarge: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 18,
+    textAlign: "center",
+    marginTop: 12,
   },
 });
